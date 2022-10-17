@@ -945,9 +945,11 @@ func bindFuncExprImplByPlanExpr(name string, args []*Expr) (*plan.Expr, error) {
 
 func (b *baseBinder) bindNumVal(astExpr *tree.NumVal, typ *Type) (*Expr, error) {
 	// over_int64_err := moerr.NewInternalError("", "Constants over int64 will support in future version.")
+	IsBin := astExpr.IsBinNum()
+	// rewrite the hexnum process logic
 	returnDecimalExpr := func(val string) (*Expr, error) {
 		if typ != nil {
-			return appendCastBeforeExpr(makePlan2StringConstExprWithType(val), typ)
+			return appendCastBeforeExpr(makePlan2StringConstExprWithType(val, IsBin), typ)
 		}
 		return makePlan2DecimalExprWithType(val)
 	}
@@ -991,6 +993,7 @@ func (b *baseBinder) bindNumVal(astExpr *tree.NumVal, typ *Type) (*Expr, error) 
 			Expr: &plan.Expr_C{
 				C: &Const{
 					Isnull: false,
+					IsBin:  IsBin,
 					Value: &plan.Const_Ival{
 						Ival: val,
 					},
@@ -1015,6 +1018,7 @@ func (b *baseBinder) bindNumVal(astExpr *tree.NumVal, typ *Type) (*Expr, error) 
 			Expr: &plan.Expr_C{
 				C: &Const{
 					Isnull: false,
+					IsBin:  IsBin,
 					Value: &plan.Const_Uval{
 						Uval: val,
 					},

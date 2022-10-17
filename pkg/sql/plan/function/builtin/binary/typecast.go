@@ -15,6 +15,7 @@
 package binary
 
 import (
+	"encoding/hex"
 	"math"
 	"strconv"
 	"strings"
@@ -563,10 +564,16 @@ func int64ToUint64(xs []int64, rs []uint64) ([]uint64, error) {
 	return rs, nil
 }
 
-func BytesToInt[T constraints.Signed](xs []string, rs []T) ([]T, error) {
+func BytesToInt[T constraints.Signed](xs []string, rs []T, isBin ...bool) ([]T, error) {
 	var bitSize = int(unsafe.Sizeof(T(0))) * 8
+	var err error
+	var val int64
 	for i, s := range xs {
-		val, err := strconv.ParseInt(strings.TrimSpace(s), 10, bitSize)
+		if len(isBin) > 0 && isBin[0] {
+			val, err = strconv.ParseInt(hex.EncodeToString(*(*[]byte)(unsafe.Pointer(&s))), 16, 64)
+		} else {
+			val, err = strconv.ParseInt(strings.TrimSpace(s), 10, bitSize)
+		}
 		if err != nil {
 			if strings.Contains(err.Error(), "value out of range") {
 				return nil, moerr.NewOutOfRange("int", "value '%v'", s)
@@ -578,11 +585,16 @@ func BytesToInt[T constraints.Signed](xs []string, rs []T) ([]T, error) {
 	return rs, nil
 }
 
-func BytesToUint[T constraints.Unsigned](xs []string, rs []T) ([]T, error) {
+func BytesToUint[T constraints.Unsigned](xs []string, rs []T, isBin ...bool) ([]T, error) {
 	var bitSize = int(unsafe.Sizeof(T(0))) * 8
-
+	var err error
+	var val uint64
 	for i, s := range xs {
-		val, err := strconv.ParseUint(strings.TrimSpace(s), 10, bitSize)
+		if len(isBin) > 0 && isBin[0] {
+			val, err = strconv.ParseUint(hex.EncodeToString(*(*[]byte)(unsafe.Pointer(&s))), 16, 64)
+		} else {
+			val, err = strconv.ParseUint(strings.TrimSpace(s), 10, bitSize)
+		}
 		if err != nil {
 			if strings.Contains(err.Error(), "value out of range") {
 				return nil, moerr.NewOutOfRange("uint", "value '%v'", s)
@@ -594,8 +606,25 @@ func BytesToUint[T constraints.Unsigned](xs []string, rs []T) ([]T, error) {
 	return rs, nil
 }
 
+// func UtilIntToBytes[T constraints.Integer](n T) []byte {
+// 	x := uint64(n)
+// 	bytesBuffer := bytes.NewBuffer([]byte{})
+// 	binary.Write(bytesBuffer, binary.BigEndian, x)
+// 	bytes := bytesBuffer.Bytes()
+// 	var res []byte
+// 	for i := range bytes {
+// 		if bytes[i] != 0 {
+// 			res = append(res, bytes[i])
+// 		}
+// 	}
+// 	if len(res) == 0 {
+// 		res = append(res, 0)
+// 	}
+// 	return res
+// }
+
 // XXX Potentially we can do much better with types.Varlena
-func IntToBytes[T constraints.Integer](xs []T, rs []string) ([]string, error) {
+func IntToBytes[T constraints.Integer](xs []T, rs []string, ZeroAndBin ...int64) ([]string, error) {
 	for i, x := range xs {
 		rs[i] = strconv.FormatInt(int64(x), 10)
 	}

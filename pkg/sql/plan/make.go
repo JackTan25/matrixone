@@ -133,20 +133,26 @@ func makePlan2Float64ConstExprWithType(v float64) *plan.Expr {
 	}
 }
 
-func makePlan2StringConstExpr(v string) *plan.Expr_C {
-	return &plan.Expr_C{C: &plan.Const{
+// preZerosNum[0] is the preZerosNum, and if the preZerosNum[1] is 1, so isBin is true
+// otherwise the isBin is false
+func makePlan2StringConstExpr(v string, isBin ...bool) *plan.Expr_C {
+	c := &plan.Expr_C{C: &plan.Const{
 		Isnull: false,
 		Value: &plan.Const_Sval{
 			Sval: v,
 		},
 	}}
+	if len(isBin) > 0 {
+		c.C.IsBin = isBin[0]
+	}
+	return c
 }
 
 var MakePlan2StringConstExprWithType = makePlan2StringConstExprWithType
 
-func makePlan2StringConstExprWithType(v string) *plan.Expr {
+func makePlan2StringConstExprWithType(v string, isBin ...bool) *plan.Expr {
 	return &plan.Expr{
-		Expr: makePlan2StringConstExpr(v),
+		Expr: makePlan2StringConstExpr(v, isBin...),
 		Typ: &plan.Type{
 			Id:       int32(types.T_varchar),
 			Nullable: false,

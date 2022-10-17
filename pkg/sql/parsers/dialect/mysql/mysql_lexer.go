@@ -15,6 +15,7 @@
 package mysql
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math"
 	"strconv"
@@ -129,21 +130,30 @@ func (l *Lexer) toHex(lval *yySymType, str string) int {
 	return HEX
 }
 
+// don't transfer 0xXXX to int,uint, all string([]byte),for example
+// 0x0616161 will be ' aaa'
 func (l *Lexer) toHexNum(lval *yySymType, str string) int {
-	ival, err := strconv.ParseUint(str[2:], 16, 64)
-	if err != nil {
-		// TODO: toDecimal()
-		//l.scanner.LastError = err
-		lval.item = str
-		return HEXNUM
+	// it won't be err, no need to process
+	s := str[2:]
+	if len(s)%2 != 0 {
+		s = string('0') + s
 	}
-	switch {
-	case ival <= math.MaxInt64:
-		lval.item = int64(ival)
-	default:
-		lval.item = ival
-	}
-	lval.str = str
+	bytes, _ := hex.DecodeString(s)
+	// ival, err := strconv.ParseUint(str[2:], 16, 64)
+	// if err != nil {
+	// 	// TODO: toDecimal()
+	// 	//l.scanner.LastError = err
+	// 	lval.item = str
+	// 	return HEXNUM
+	// }
+	// switch {
+	// case ival <= math.MaxInt64:
+	// 	lval.item = int64(ival)
+	// default:
+	// 	lval.item = ival
+	// }
+	// lval.str = str
+	lval.item = string(bytes)
 	return HEXNUM
 }
 

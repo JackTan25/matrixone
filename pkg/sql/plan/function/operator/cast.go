@@ -915,7 +915,7 @@ func CastSpecials1Int[T constraints.Signed](lv, rv *vector.Vector, proc *process
 		return proc.AllocConstNullVector(rv.Typ, lv.Length()), nil
 	} else if lv.IsScalar() {
 		rs := make([]T, 1)
-		if _, err = binary.BytesToInt(col, rs); err != nil {
+		if _, err = binary.BytesToInt(col, rs, lv.GetIsBin()); err != nil {
 			return nil, err
 		}
 		return vector.NewConstFixed(rv.Typ, lv.Length(), rs[0], proc.Mp()), nil
@@ -2208,7 +2208,7 @@ func IsNumeric(t types.T) bool {
 
 // isString: return true if the types.T is string type
 func isString(t types.T) bool {
-	if t == types.T_char || t == types.T_varchar || t == types.T_blob {
+	if t == types.T_char || t == types.T_varchar || t == types.T_blob || t == types.T_text {
 		return true
 	}
 	return false

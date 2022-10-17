@@ -28,6 +28,10 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"math"
+	"strconv"
+	"time"
+
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
@@ -40,9 +44,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 	"github.com/matrixorigin/simdcsv"
 	"github.com/pierrec/lz4"
-	"math"
-	"strconv"
-	"time"
 )
 
 func String(arg any, buf *bytes.Buffer) {

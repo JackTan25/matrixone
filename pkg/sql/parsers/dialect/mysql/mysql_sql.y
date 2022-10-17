@@ -6566,10 +6566,6 @@ literal:
 |   HEXNUM
     {
         switch v := $1.(type) {
-        case uint64:
-            $$ = tree.NewNumValWithType(constant.MakeUint64(v), yylex.(*Lexer).scanner.LastToken, false, tree.P_uint64)
-        case int64:
-            $$ = tree.NewNumValWithType(constant.MakeInt64(v), yylex.(*Lexer).scanner.LastToken, false, tree.P_int64)
         case string:
             $$ = tree.NewNumValWithType(constant.MakeString(v), v, false, tree.P_hexnum)
         default:
@@ -7072,7 +7068,7 @@ char_type:
                 Family: tree.BlobFamily,
                 FamilyString: $1,
                 Locale: &locale,
-                Oid:    uint32(defines.MYSQL_TYPE_BLOB),
+                Oid:    uint32(defines.MYSQL_TYPE_TEXT),
             },
         }
     }
