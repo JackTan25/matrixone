@@ -1474,7 +1474,7 @@ func rowToColumnAndSaveToStorage(handler *WriteBatchHandler, forceConvert bool, 
 					} else {
 						field := line[j]
 						//logutil.Infof("==== > field string [%s] ",fs)
-						d, err := types.ParseStringToDecimal64(field, vec.Typ.Width, vec.Typ.Scale)
+						d, err := types.ParseStringToDecimal64(field, vec.Typ.Width, vec.Typ.Scale, vec.GetIsBin())
 						if err != nil {
 							logutil.Errorf("parse field[%v] err:%v", field, err)
 							if !ignoreFieldError {
@@ -1496,7 +1496,7 @@ func rowToColumnAndSaveToStorage(handler *WriteBatchHandler, forceConvert bool, 
 					} else {
 						field := line[j]
 						//logutil.Infof("==== > field string [%s] ",fs)
-						d, err := types.ParseStringToDecimal128(field, vec.Typ.Width, vec.Typ.Scale)
+						d, err := types.ParseStringToDecimal128(field, vec.Typ.Width, vec.Typ.Scale, vec.GetIsBin())
 						if err != nil {
 							logutil.Errorf("parse field[%v] err:%v", field, err)
 							if !ignoreFieldError {

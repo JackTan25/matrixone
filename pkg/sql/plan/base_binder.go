@@ -947,11 +947,11 @@ func (b *baseBinder) bindNumVal(astExpr *tree.NumVal, typ *Type) (*Expr, error) 
 	// over_int64_err := moerr.NewInternalError("", "Constants over int64 will support in future version.")
 	IsBin := astExpr.IsBinNum()
 	// rewrite the hexnum process logic
-	returnDecimalExpr := func(val string) (*Expr, error) {
+	returnDecimalExpr := func(val string, isBin ...bool) (*Expr, error) {
 		if typ != nil {
-			return appendCastBeforeExpr(makePlan2StringConstExprWithType(val, IsBin), typ)
+			return appendCastBeforeExpr(makePlan2StringConstExprWithType(val, isBin...), typ)
 		}
-		return makePlan2DecimalExprWithType(val)
+		return makePlan2DecimalExprWithType(val, isBin...)
 	}
 
 	switch astExpr.ValType {
@@ -1063,7 +1063,7 @@ func (b *baseBinder) bindNumVal(astExpr *tree.NumVal, typ *Type) (*Expr, error) 
 			},
 		}, nil
 	case tree.P_hexnum:
-		return returnDecimalExpr(astExpr.String())
+		return returnDecimalExpr(astExpr.String(), IsBin)
 	case tree.P_bit:
 		return returnDecimalExpr(astExpr.String())
 	case tree.P_char:

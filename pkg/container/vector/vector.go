@@ -51,7 +51,10 @@ type Vector struct {
 	// some attributes for const vector (a vector with a lot of rows of a same const value)
 	isConst bool
 	length  int
-	// tag 0xXXXX
+
+	// tag for distinguish '0x00..' and 0x... and 0x... is binary
+	// TODO: check whether isBin should be changed into array/bitmap
+	// now we assumpt that it can only be true in the case of only one data in vector
 	isBin bool
 }
 

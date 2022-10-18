@@ -1,3 +1,14 @@
+#Test basic insert function of blob
+drop table if exists t1;
+create table t1 (a blob);
+insert into t1 values('abcdef');
+insert into t1 values('0xabcdef');
+insert into t1 values(0xabcdef);
+insert into t1 values(0x0abcdef);
+insert into t1 values(1234);
+insert into t1 values(01234);
+select * from t1;
+
 #Test cases of query with single table and operators
 drop table if exists t1;
 create table t1 (a blob);

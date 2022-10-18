@@ -653,11 +653,17 @@ func Decimal128ToBytes(xs []types.Decimal128, rs []string, scale int32) ([]strin
 	return rs, nil
 }
 
-func BytesToFloat[T constraints.Float](xs []string, rs []T, isEmptyStringOrNull ...[]int) ([]T, error) {
+func BytesToFloat[T constraints.Float](xs []string, rs []T, isBin bool, isEmptyStringOrNull ...[]int) ([]T, error) {
 	var bitSize = int(unsafe.Sizeof(T(0))) * 8
 	usedEmptyStringOrNull := len(isEmptyStringOrNull) > 0
 	for i, s := range xs {
-		val, err := strconv.ParseFloat(s, bitSize)
+		var err error
+		var val float64
+		if isBin {
+			val, err = strconv.ParseFloat(hex.EncodeToString(*(*[]byte)(unsafe.Pointer(&s))), bitSize)
+		} else {
+			val, err = strconv.ParseFloat(s, bitSize)
+		}
 		if err != nil {
 			if usedEmptyStringOrNull {
 				if !strings.Contains(err.Error(), "value out of range") {
@@ -931,6 +937,17 @@ func Decimal128ToDecimal128(xs []types.Decimal128, width, scale int32, rs []type
 	for i, x := range xs {
 		xStr := x.ToStringWithScale(scale)
 		rs[i], err = types.Decimal128_FromString(xStr)
+		if err != nil {
+			return []types.Decimal128{}, moerr.NewOutOfRange("dec128", "value '%v'", x)
+		}
+	}
+	return rs, nil
+}
+
+func BinaryByteToDecimal128(xs []string, rs []types.Decimal128) ([]types.Decimal128, error) {
+	var err error
+	for i, x := range xs {
+		rs[i], err = types.Decimal128_FromString(hex.EncodeToString(*(*[]byte)(unsafe.Pointer(&x))))
 		if err != nil {
 			return []types.Decimal128{}, moerr.NewOutOfRange("dec128", "value '%v'", x)
 		}

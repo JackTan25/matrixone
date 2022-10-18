@@ -282,7 +282,7 @@ var (
 		if err != nil {
 			panic(err)
 		}
-		dec128Val, err := types.ParseStringToDecimal128(val, 34, scale)
+		dec128Val, err := types.ParseStringToDecimal128(val, 34, scale, false)
 		if err != nil {
 			panic(err)
 		}
