@@ -765,6 +765,14 @@ func constructDispatch(all bool, regs []*process.WaitRegister) *dispatch.Argumen
 	return arg
 }
 
+func constructDeleteDispatchCrossCN(localIndex int, nodes []colexec.WrapperNode) *dispatch.Argument {
+	arg := new(dispatch.Argument)
+	arg.LocalIndex = uint64(localIndex)
+	arg.Nodes = nodes
+	arg.SendFunc = deleteDispatch
+	return arg
+}
+
 func constructMergeGroup(_ *plan.Node, needEval bool) *mergegroup.Argument {
 	return &mergegroup.Argument{
 		NeedEval: needEval,

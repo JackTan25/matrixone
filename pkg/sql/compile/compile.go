@@ -21,6 +21,7 @@ import (
 	"runtime"
 	"sync/atomic"
 
+	"github.com/google/uuid"
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/defines"
 	"github.com/matrixorigin/matrixone/pkg/sql/util"
@@ -37,6 +38,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/pb/timestamp"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/connector"
+	"github.com/matrixorigin/matrixone/pkg/sql/colexec/deletion"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/external"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/merge"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/output"
@@ -308,33 +310,46 @@ func (c *Compile) compileTpQuery(qry *plan.Query, ss []*Scope) (*Scope, error) {
 }
 
 func (c *Compile) compileApQuery(qry *plan.Query, ss []*Scope) (*Scope, error) {
-	rs := c.newMergeScope(ss)
-	updateScopesLastFlag([]*Scope{rs})
-	c.SetAnalyzeCurrent([]*Scope{rs}, c.anal.curr)
+	var rs *Scope
 	switch qry.StmtType {
 	case plan.Query_DELETE:
-		rs.Magic = Deletion
-	case plan.Query_INSERT:
-		rs.Magic = Insert
-	case plan.Query_UPDATE:
-		rs.Magic = Update
-	default:
-	}
-	switch qry.StmtType {
-	case plan.Query_DELETE:
-		scp, err := constructDeletion(qry.Nodes[qry.Steps[0]], c.e, c.proc)
-		if err != nil {
-			return nil, err
+		// when the data is too large in this sql, we need to trigger
+		// cn-write-s3 mode, and please remember that we just process
+		// one sql per time, not the whole transaction, it means even
+		// if we use 'begin ... commit' like this, we won't get all sqls'
+		// statisc to trigger cn-write-s3, just only one sql is ok.
+		deleteNode := qry.Nodes[qry.Steps[0]]
+		// over threshold will trigger distributed delete operations
+		if qry.Nodes[deleteNode.Children[0]].Stats.Cost > float64(DistributedThreshold) {
+			// 1. we need to make deleteion pipeline
+			scp, err := constructDeletion(deleteNode, c.e, c.proc)
+			if err != nil {
+				return nil, err
+			}
+			rs := c.newMergeDeleteScope(scp, ss)
+			rs.Magic = Merge
+			// ToDo: rs will get blockMeta, how to give them to distae
+		} else {
+			rs := c.newMergeScope(ss)
+			rs.Magic = Deletion
+			c.SetAnalyzeCurrent([]*Scope{rs}, c.anal.curr)
+			scp, err := constructDeletion(deleteNode, c.e, c.proc)
+			if err != nil {
+				return nil, err
+			}
+			rs.Instructions = append(rs.Instructions, vm.Instruction{
+				Op:  vm.Deletion,
+				Arg: scp,
+			})
 		}
-		rs.Instructions = append(rs.Instructions, vm.Instruction{
-			Op:  vm.Deletion,
-			Arg: scp,
-		})
 	case plan.Query_INSERT:
 		arg, err := constructInsert(qry.Nodes[qry.Steps[0]], c.e, c.proc)
 		if err != nil {
 			return nil, err
 		}
+		rs := c.newMergeScope(ss)
+		rs.Magic = Insert
+		c.SetAnalyzeCurrent([]*Scope{rs}, c.anal.curr)
 		rs.Instructions = append(rs.Instructions, vm.Instruction{
 			Op:  vm.Insert,
 			Arg: arg,
@@ -344,11 +359,16 @@ func (c *Compile) compileApQuery(qry *plan.Query, ss []*Scope) (*Scope, error) {
 		if err != nil {
 			return nil, err
 		}
+		rs := c.newMergeScope(ss)
+		rs.Magic = Update
+		c.SetAnalyzeCurrent([]*Scope{rs}, c.anal.curr)
 		rs.Instructions = append(rs.Instructions, vm.Instruction{
 			Op:  vm.Update,
 			Arg: scp,
 		})
 	default:
+		rs := c.newMergeScope(ss)
+		c.SetAnalyzeCurrent([]*Scope{rs}, c.anal.curr)
 		rs.Instructions = append(rs.Instructions, vm.Instruction{
 			Op: vm.Output,
 			Arg: &output.Argument{
@@ -1129,6 +1149,73 @@ func (c *Compile) compileGroup(n *plan.Node, ss []*Scope, ns []*plan.Node) []*Sc
 		})
 	}
 	return []*Scope{c.newMergeScope(append(rs, ss...))}
+}
+
+// this is used for dispatch operator,if there are n CNs,
+// the dispatch operator in CNi, it will transfer batch to CNj(j!=i)
+// remotely and send batch to CNi locally.
+func GenerateWrapNodes(mergeScopes []*Scope, localIndex int) (nodes []colexec.WrapperNode) {
+	for j := 0; j < len(mergeScopes); j++ {
+		// dispatch batch to CNj, it will be recieved by mergeScope[j].proc.Regs[localIndex],
+		// we use uuid to get the mergeScope[j].proc.Regs[localIndex] from map when batch arrives
+		nodes = append(nodes, colexec.WrapperNode{
+			Node: mergeScopes[j].NodeInfo,
+			Uuid: mergeScopes[j].uuids[localIndex],
+		})
+		if j == localIndex {
+			nodes[j].Node.Addr = ""
+		}
+	}
+	return
+}
+
+// we will constuct pipeline reference to here
+// https://github.com/JackTan25/docs/blob/main/design/imgs/pipeline_design.png
+func (c *Compile) newMergeDeleteScope(arg *deletion.Argument, ss []*Scope) *Scope {
+	var ss2 []*Scope
+	for _, s := range ss {
+		if s.IsEnd {
+			continue
+		}
+		ss2 = append(ss2, s)
+	}
+	cnt := len(ss2)
+	mergeScopes := make([]*Scope, cnt)
+	for i := range mergeScopes {
+		mergeScopes = append(mergeScopes, nil)
+		ss2[i].Instructions = append(ss2[i].Instructions)
+		// ToDo: PreScopes have only one scope, it will result
+		// childCount is 1, so need to resolve it
+		mergeScopes[i] = &Scope{
+			PreScopes: []*Scope{ss2[i]},
+			NodeInfo:  ss2[i].NodeInfo,
+			Magic:     Remote,
+		}
+		mergeScopes[i].Instructions = append(mergeScopes[i].Instructions, vm.Instruction{
+			Op:      vm.Merge,
+			Idx:     c.anal.curr,
+			IsFirst: c.anal.isFirst,
+			Arg:     &merge.Argument{},
+		})
+		mergeScopes[i].Instructions = append(mergeScopes[i].Instructions, vm.Instruction{
+			Op:  vm.Deletion,
+			Arg: arg,
+		})
+		mergeScopes[i].Proc = process.NewWithAnalyze(c.proc, c.ctx, cnt, c.anal.Nodes())
+		mergeScopes[i].uuids = make([]uuid.UUID, cnt)
+		for j := 0; j < cnt; j++ {
+			mergeScopes[i].uuids = append(mergeScopes[i].uuids, uuid.New())
+		}
+	}
+	for i := range ss2 {
+		ss2[i].Instructions = append(ss2[i].Instructions, vm.Instruction{
+			Op:      vm.Dispatch,
+			Idx:     c.anal.curr,
+			IsFirst: c.anal.isFirst,
+			Arg:     constructDeleteDispatchCrossCN(i, GenerateWrapNodes(mergeScopes, i)),
+		})
+	}
+	return c.newMergeScope(mergeScopes)
 }
 
 func (c *Compile) newMergeScope(ss []*Scope) *Scope {

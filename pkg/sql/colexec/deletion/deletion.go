@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"sync/atomic"
 
+	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/update"
 
@@ -32,6 +33,13 @@ func String(arg any, buf *bytes.Buffer) {
 func Prepare(_ *process.Process, _ any) error {
 	return nil
 }
+
+// deletion will parse the rowId of the bacth rows to get segmentId and BlockId,
+// and then we can know which CN we need to this,we need to make sure one block will be
+// deleted by only one CN
+// deletion need to separate batch into CN Blocks and DN Blocks here,
+// and in deletion operator, we will write s3, but for CN blocks we need to do Compaction
+// and DN blocks we won't do Compaction for now
 
 // the bool return value means whether it completed its work or not
 func Call(_ int, proc *process.Process, arg any, isFirst bool, isLast bool) (bool, error) {
@@ -78,4 +86,26 @@ func Call(_ int, proc *process.Process, arg any, isFirst bool, isLast bool) (boo
 	}
 
 	return false, nil
+}
+
+// CN rowId format:
+/**
+* | 12 bytes | 2 bytes | 2 bytes |
+  | segmentId| blockId |  offset |
+**/
+// DN rowId format:
+/**
+* | 6 bytes | 6 bytes | 4 bytes |
+  |segmentId| blockId |  offset |
+**/
+// DN rowId's highest bit is always 0
+// CN rowId's highest bit is always 1
+func DecodeRowId(Id types.Rowid) (segmentId, blockId []byte) {
+	// 1.DN Blocks
+	if Id[0]>>7 == 0 {
+		return Id[0:6], Id[6:12]
+	} else {
+		// 2.CN Blocks
+		return Id[0:12], Id[12:14]
+	}
 }
