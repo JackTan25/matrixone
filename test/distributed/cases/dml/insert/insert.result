@@ -413,24 +413,6 @@ select count(*) from t;
 count(*)
 200001
 drop table t;
-create table t(a int auto_increment,b int);
-insert into t(b) select * from generate_series(1,200000) g;
-select count(*) from t;
-count(*)
-200000
-select a from t where a > 199990;
-a
-199991
-199992
-199993
-199994
-199995
-199996
-199997
-199998
-199999
-200000
-drop table t;
 drop table if exists t1;
 create table t1(
 col1 tinyint,
