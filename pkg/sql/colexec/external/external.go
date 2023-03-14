@@ -54,13 +54,12 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/util/errutil"
 	"github.com/matrixorigin/matrixone/pkg/util/trace"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/dataio/blockio"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 	"github.com/pierrec/lz4"
 )
 
 var (
-	ONE_BATCH_MAX_ROW  = int(options.DefaultBlockMaxRows)
+	ONE_BATCH_MAX_ROW  = 5
 	S3_PARALLEL_MAXNUM = 10
 )
 

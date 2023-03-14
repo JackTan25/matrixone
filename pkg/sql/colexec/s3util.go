@@ -16,6 +16,7 @@ package colexec
 
 import (
 	"fmt"
+
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
@@ -167,6 +168,7 @@ func (w *S3Writer) initBuffers(bat *batch.Batch, idx int) {
 // 0: the tableBatches[idx] is equal to threshold
 // -1: the tableBatches[idx] is less than threshold
 func (w *S3Writer) put(bat *batch.Batch, idx int) int {
+	bat.Cnt++
 	w.tableBatchSizes[idx] += uint64(bat.Size())
 	w.tableBatches[idx] = append(w.tableBatches[idx], bat)
 	if w.tableBatchSizes[idx] == WriteS3Threshold {
@@ -197,6 +199,11 @@ func getStrCols(bats []*batch.Batch, idx int) [][]string {
 // len(sortIndex) is always only one.
 func (w *S3Writer) mergeBlock(idx int, length int, proc *process.Process) error {
 	bats := w.tableBatches[idx][:length]
+	defer func() {
+		for i := 0; i < len(bats); i++ {
+			bats[i].Clean(proc.GetMPool())
+		}
+	}()
 	sortIdx := -1
 	for _, bat := range bats {
 		// sort bats firstly
