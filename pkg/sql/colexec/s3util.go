@@ -205,6 +205,11 @@ func (w *S3Writer) mergeBlock(idx int, length int, proc *process.Process) error 
 		}
 	}()
 	sortIdx := -1
+	lens0 := 0
+	lens1 := 0
+	for _, bat := range bats {
+		lens0 += bat.Length()
+	}
 	for _, bat := range bats {
 		// sort bats firstly
 		// for main table
@@ -212,6 +217,12 @@ func (w *S3Writer) mergeBlock(idx int, length int, proc *process.Process) error 
 			sortByKey(proc, bat, w.sortIndex, proc.GetMPool())
 			sortIdx = w.sortIndex[0]
 		}
+	}
+	for _, bat := range bats {
+		lens1 += bat.Length()
+	}
+	if lens0 != lens1 {
+		panic("不相等的lens")
 	}
 	// just write ahead, no need to sort
 	if sortIdx == -1 {
