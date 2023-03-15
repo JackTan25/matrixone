@@ -224,7 +224,7 @@ func (w *S3Writer) mergeBlock(idx int, length int, proc *process.Process) error 
 	if lens0 != lens1 {
 		panic("不相等的lens")
 	}
-	sortIdx = -1
+	// sortIdx = -1
 	// just write ahead, no need to sort
 	if sortIdx == -1 {
 		if err := w.generateWriter(proc); err != nil {
@@ -333,6 +333,7 @@ func (w *S3Writer) mergeBlock(idx int, length int, proc *process.Process) error 
 		if err := w.writeEndBlocks(proc, idx); err != nil {
 			return err
 		}
+		w.buffers[idx].CleanOnlyData()
 		if all_int_lens != init_int_len {
 			panic("不相等啊")
 		}
