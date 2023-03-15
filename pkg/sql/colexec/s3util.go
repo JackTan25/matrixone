@@ -227,6 +227,16 @@ func (w *S3Writer) mergeBlock(idx int, length int, proc *process.Process) error 
 			return err
 		}
 	} else {
+		fmt.Println("========================================================")
+		init_str := "["
+		init_int_len := 0
+		for i := 0; i < len(bats); i++ {
+			init_str += fmt.Sprintf("%d", bats[i].Length())
+			init_str += ","
+			init_int_len += bats[i].Length()
+		}
+		init_str += "]"
+		fmt.Println(init_str)
 		var merge MergeInterface
 		var nulls []*nulls.Nulls
 		for i := 0; i < len(bats); i++ {
@@ -276,6 +286,8 @@ func (w *S3Writer) mergeBlock(idx int, length int, proc *process.Process) error 
 		if err := w.generateWriter(proc); err != nil {
 			return err
 		}
+		all_lens := "["
+		all_int_lens := 0
 		lens := 0
 		size := len(bats)
 		var batchIndex int
@@ -287,6 +299,8 @@ func (w *S3Writer) mergeBlock(idx int, length int, proc *process.Process) error 
 			}
 			lens++
 			if lens == int(options.DefaultBlockMaxRows) {
+				all_lens += fmt.Sprintf("%d,", lens)
+				all_int_lens += lens
 				lens = 0
 				if err := w.writeBlock(w.buffers[idx]); err != nil {
 					return err
@@ -296,14 +310,22 @@ func (w *S3Writer) mergeBlock(idx int, length int, proc *process.Process) error 
 			}
 		}
 		if lens > 0 {
+			all_lens += fmt.Sprintf("%d,", lens)
+			all_int_lens += lens
 			if err := w.writeBlock(w.buffers[idx]); err != nil {
 				return err
 			}
 		}
+		all_lens += "]"
+		fmt.Println(all_lens)
 		if err := w.writeEndBlocks(proc, idx); err != nil {
 			return err
 		}
+		if all_int_lens != init_int_len {
+			panic("不相等啊")
+		}
 	}
+	fmt.Println("========================================================")
 	left := w.tableBatches[idx][length:]
 	w.tableBatches[idx] = left
 	w.tableBatchSizes[idx] = 0
