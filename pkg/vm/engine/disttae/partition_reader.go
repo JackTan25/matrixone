@@ -181,7 +181,7 @@ func (p *PartitionReader) Read(ctx context.Context, colNames []string, expr *pla
 				rbat.AntiShrink(deletes)
 			}
 			logutil.Debug(testutil.OperatorCatchBatch("partition reader[s3]", rbat))
-			if p.table == "test" {
+			if p.table == "t" {
 				fmt.Println("partition_reader: ", rbat.Length())
 			}
 			return rbat, nil
@@ -208,7 +208,7 @@ func (p *PartitionReader) Read(ctx context.Context, colNames []string, expr *pla
 			}
 			b.SetZs(bat.Length(), p.procMPool)
 			logutil.Debug(testutil.OperatorCatchBatch("partition reader[workspace]", b))
-			if p.table == "test" {
+			if p.table == "t" {
 				fmt.Println("partition_reader: ", b.Length())
 			}
 			return b, nil
@@ -271,7 +271,7 @@ func (p *PartitionReader) Read(ctx context.Context, colNames []string, expr *pla
 	}
 	// XXX I'm not sure `normal` is a good description
 	logutil.Debug(testutil.OperatorCatchBatch("partition reader[normal]", b))
-	if p.table == "test" {
+	if p.table == "t" {
 		fmt.Println("partition_reader: ", b.Length())
 	}
 	return b, nil
