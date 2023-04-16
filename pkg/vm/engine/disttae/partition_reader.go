@@ -16,6 +16,7 @@ package disttae
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
@@ -179,6 +180,7 @@ func (p *PartitionReader) Read(ctx context.Context, colNames []string, expr *pla
 				rbat.AntiShrink(deletes)
 			}
 			logutil.Debug(testutil.OperatorCatchBatch("partition reader[s3]", rbat))
+			fmt.Println("partition_reader: ", rbat.Length())
 			return rbat, nil
 		} else {
 			bat = p.inserts[0].GetSubBatch(colNames)
@@ -203,6 +205,7 @@ func (p *PartitionReader) Read(ctx context.Context, colNames []string, expr *pla
 			}
 			b.SetZs(bat.Length(), p.procMPool)
 			logutil.Debug(testutil.OperatorCatchBatch("partition reader[workspace]", b))
+			fmt.Println("partition_reader: ", b.Length())
 			return b, nil
 		}
 	}
@@ -263,5 +266,6 @@ func (p *PartitionReader) Read(ctx context.Context, colNames []string, expr *pla
 	}
 	// XXX I'm not sure `normal` is a good description
 	logutil.Debug(testutil.OperatorCatchBatch("partition reader[normal]", b))
+	fmt.Println("partition_reader: ", b.Length())
 	return b, nil
 }
