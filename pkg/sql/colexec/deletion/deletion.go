@@ -16,6 +16,7 @@ package deletion
 
 import (
 	"bytes"
+	"fmt"
 	"sync/atomic"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
@@ -65,6 +66,7 @@ func Call(_ int, proc *process.Process, arg any, isFirst bool, isLast bool) (boo
 	// last batch of block
 	if bat == nil {
 		if p.RemoteDelete {
+			fmt.Println("debug_delete_len: ", p.ctr.debug_len)
 			// ToDo: CNBlock Compaction
 			// blkId,delta_metaLoc,type
 			resBat := batch.New(true, []string{
