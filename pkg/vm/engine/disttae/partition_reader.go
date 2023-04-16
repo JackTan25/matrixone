@@ -52,6 +52,7 @@ type PartitionReader struct {
 	blockBatch      *BlockBatch
 	currentFileName string
 	deletes_map     map[string][]int64
+	table           string
 }
 
 // BlockBatch is used to record the metaLoc info
@@ -180,7 +181,9 @@ func (p *PartitionReader) Read(ctx context.Context, colNames []string, expr *pla
 				rbat.AntiShrink(deletes)
 			}
 			logutil.Debug(testutil.OperatorCatchBatch("partition reader[s3]", rbat))
-			fmt.Println("partition_reader: ", rbat.Length())
+			if p.table == "test" {
+				fmt.Println("partition_reader: ", rbat.Length())
+			}
 			return rbat, nil
 		} else {
 			bat = p.inserts[0].GetSubBatch(colNames)
@@ -205,7 +208,9 @@ func (p *PartitionReader) Read(ctx context.Context, colNames []string, expr *pla
 			}
 			b.SetZs(bat.Length(), p.procMPool)
 			logutil.Debug(testutil.OperatorCatchBatch("partition reader[workspace]", b))
-			fmt.Println("partition_reader: ", b.Length())
+			if p.table == "test" {
+				fmt.Println("partition_reader: ", b.Length())
+			}
 			return b, nil
 		}
 	}
@@ -266,6 +271,8 @@ func (p *PartitionReader) Read(ctx context.Context, colNames []string, expr *pla
 	}
 	// XXX I'm not sure `normal` is a good description
 	logutil.Debug(testutil.OperatorCatchBatch("partition reader[normal]", b))
-	fmt.Println("partition_reader: ", b.Length())
+	if p.table == "test" {
+		fmt.Println("partition_reader: ", b.Length())
+	}
 	return b, nil
 }

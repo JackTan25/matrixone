@@ -881,6 +881,7 @@ func (tbl *txnTable) newReader(
 	}
 
 	partReader := &PartitionReader{
+		table:           tbl.tableName,
 		typsMap:         mp,
 		inserts:         inserts,
 		deletes:         deletes,
