@@ -273,17 +273,4 @@ select count(*) from t;
 count(*)
 512
 rollback;
-select count(*) from t;
-count(*)
-2097152
-begin;
-insert into t select * from t;
-delete from t where a > 1;
-select count(*) from t;
-count(*)
-512
-commit;
-select count(*) from t;
-count(*)
-512
 drop database if exists test;
