@@ -53,6 +53,7 @@ type PartitionReader struct {
 	currentFileName string
 	deletes_map     map[string][]int64
 	table           string
+	debug_len       uint64
 }
 
 // BlockBatch is used to record the metaLoc info
@@ -183,6 +184,8 @@ func (p *PartitionReader) Read(ctx context.Context, colNames []string, expr *pla
 			logutil.Debug(testutil.OperatorCatchBatch("partition reader[s3]", rbat))
 			if p.table == "t" {
 				fmt.Println("partition_reader: ", rbat.Length())
+				p.debug_len += uint64(rbat.Length())
+				fmt.Println("debug_len: ", p.debug_len)
 			}
 			return rbat, nil
 		} else {
@@ -210,6 +213,8 @@ func (p *PartitionReader) Read(ctx context.Context, colNames []string, expr *pla
 			logutil.Debug(testutil.OperatorCatchBatch("partition reader[workspace]", b))
 			if p.table == "t" {
 				fmt.Println("partition_reader: ", b.Length())
+				p.debug_len += uint64(b.Length())
+				fmt.Println("debug_len: ", p.debug_len)
 			}
 			return b, nil
 		}
@@ -273,6 +278,8 @@ func (p *PartitionReader) Read(ctx context.Context, colNames []string, expr *pla
 	logutil.Debug(testutil.OperatorCatchBatch("partition reader[normal]", b))
 	if p.table == "t" {
 		fmt.Println("partition_reader: ", b.Length())
+		p.debug_len += uint64(b.Length())
+		fmt.Println("debug_len: ", p.debug_len)
 	}
 	return b, nil
 }
