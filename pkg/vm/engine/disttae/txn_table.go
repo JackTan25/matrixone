@@ -859,7 +859,6 @@ func (tbl *txnTable) newReader(
 			}
 		}
 	}
-	_ = tbl.meta.blocks
 	// get append block deletes rowids
 	// just only one DN
 	non_append_block := make(map[string]bool)
