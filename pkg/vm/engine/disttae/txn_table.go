@@ -863,12 +863,15 @@ func (tbl *txnTable) newReader(
 	// get append block deletes rowids
 	// just only one DN
 	non_append_block := make(map[string]bool)
-	for _, blk := range tbl.meta.blocks[0] {
-		// append non_append_block
-		if !blk.Info.EntryState {
-			non_append_block[string(blk.Info.BlockID[:])] = true
+	if tbl.meta != nil {
+		for _, blk := range tbl.meta.blocks[0] {
+			// append non_append_block
+			if !blk.Info.EntryState {
+				non_append_block[string(blk.Info.BlockID[:])] = true
+			}
 		}
 	}
+
 	for blkId := range tbl.db.txn.blockId_dn_delete_metaLoc_batch {
 		if !non_append_block[blkId] {
 			fmt.Println("deletes RowId Here")
