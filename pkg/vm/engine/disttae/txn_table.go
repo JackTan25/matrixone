@@ -863,7 +863,7 @@ func (tbl *txnTable) newReader(
 	// get append block deletes rowids
 	// just only one DN
 	non_append_block := make(map[string]bool)
-	if tbl.meta != nil {
+	if tbl.meta != nil && len(tbl.meta.blocks) > 0 {
 		for _, blk := range tbl.meta.blocks[0] {
 			// append non_append_block
 			if !blk.Info.EntryState {
