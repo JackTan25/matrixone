@@ -863,10 +863,10 @@ func (tbl *txnTable) newReader(
 	// just only one DN
 	for _, blk := range tbl.meta.blocks[0] {
 		// append block
-		if blk.Info.EntryState {
-			fmt.Println("deletes RowId Here")
-			tbl.LoadDeletesForBlock(blk.Info.BlockID, nil, deletes)
-		}
+		// if blk.Info.EntryState {
+		fmt.Println("deletes RowId Here")
+		tbl.LoadDeletesForBlock(blk.Info.BlockID, nil, deletes)
+		// }
 	}
 	readers := make([]engine.Reader, readerNumber)
 
