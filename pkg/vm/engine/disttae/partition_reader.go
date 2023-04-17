@@ -183,7 +183,7 @@ func (p *PartitionReader) Read(ctx context.Context, colNames []string, expr *pla
 			}
 			logutil.Debug(testutil.OperatorCatchBatch("partition reader[s3]", rbat))
 			if p.table == "t" {
-				fmt.Println("partition_reader: ", rbat.Length())
+				fmt.Println("block partition_reader: ", rbat.Length())
 				p.debug_len += uint64(rbat.Length())
 				fmt.Println("debug_len: ", p.debug_len)
 			}
@@ -212,7 +212,7 @@ func (p *PartitionReader) Read(ctx context.Context, colNames []string, expr *pla
 			b.SetZs(bat.Length(), p.procMPool)
 			logutil.Debug(testutil.OperatorCatchBatch("partition reader[workspace]", b))
 			if p.table == "t" {
-				fmt.Println("partition_reader: ", b.Length())
+				fmt.Println("raw batch partition_reader: ", b.Length())
 				p.debug_len += uint64(b.Length())
 				fmt.Println("debug_len: ", p.debug_len)
 			}
@@ -277,7 +277,7 @@ func (p *PartitionReader) Read(ctx context.Context, colNames []string, expr *pla
 	// XXX I'm not sure `normal` is a good description
 	logutil.Debug(testutil.OperatorCatchBatch("partition reader[normal]", b))
 	if p.table == "t" {
-		fmt.Println("partition_reader: ", b.Length())
+		fmt.Println("DN block partition_reader: ", b.Length())
 		p.debug_len += uint64(b.Length())
 		fmt.Println("debug_len: ", p.debug_len)
 	}
