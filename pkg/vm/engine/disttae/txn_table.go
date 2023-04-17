@@ -178,7 +178,7 @@ func (tbl *txnTable) Size(ctx context.Context, name string) (int64, error) {
 	return 0, nil
 }
 
-func (tbl *txnTable) LoadDeletesForBlock(blockID types.Blockid, deleteBlockId map[types.Blockid][]int, deletesRowId map[types.Rowid]uint8) error {
+func (tbl *txnTable) LoadDeletesForBlock(blockID string, deleteBlockId map[types.Blockid][]int, deletesRowId map[types.Rowid]uint8) error {
 	for _, bat := range tbl.db.txn.blockId_dn_delete_metaLoc_batch[string(blockID[:])] {
 		vs := vector.MustStrCol(bat.GetVector(0))
 		for _, metalLoc := range vs {
@@ -273,7 +273,7 @@ func (tbl *txnTable) Ranges(ctx context.Context, expr *plan.Expr) ([][]byte, err
 				}
 				iter.Close()
 				// DN flush deletes rowids block
-				if err = tbl.LoadDeletesForBlock(blockID, deletes, nil); err != nil {
+				if err = tbl.LoadDeletesForBlock(string(blockID[:]), deletes, nil); err != nil {
 					return nil, err
 				}
 			}
@@ -861,11 +861,17 @@ func (tbl *txnTable) newReader(
 	}
 	// get append block deletes rowids
 	// just only one DN
+	non_append_block := make(map[string]bool)
 	for _, blk := range tbl.meta.blocks[0] {
-		// append block
-		if blk.Info.EntryState {
+		// append non_append_block
+		if !blk.Info.EntryState {
+			non_append_block[string(blk.Info.BlockID[:])] = true
+		}
+	}
+	for blkId := range tbl.db.txn.blockId_dn_delete_metaLoc_batch {
+		if !non_append_block[blkId] {
 			fmt.Println("deletes RowId Here")
-			tbl.LoadDeletesForBlock(blk.Info.BlockID, nil, deletes)
+			tbl.LoadDeletesForBlock(blkId, nil, deletes)
 		}
 	}
 	readers := make([]engine.Reader, readerNumber)
