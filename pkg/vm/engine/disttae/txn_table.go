@@ -890,11 +890,15 @@ func (tbl *txnTable) newReader(
 	meta_blocks := make(map[string]bool)
 	if len(tbl.blockInfos) > 0 {
 		for _, blk := range tbl.blockInfos[0] {
+			fmt.Println("NewPartitionReader BlockId: ", blk.BlockID.String())
 			meta_blocks[string(blk.BlockID[:])] = true
 		}
 	}
 
 	for blkId := range tbl.db.txn.blockId_dn_delete_metaLoc_batch {
+		var id types.Blockid
+		copy(id[:], []byte(blkId))
+		fmt.Println("NewPartitionReader Deletes BlockId: ", id.String())
 		if !meta_blocks[blkId] {
 			tbl.LoadDeletesForBlock(blkId, nil, deletes)
 		}
