@@ -317,6 +317,8 @@ type blockReader struct {
 	init       bool
 	canCompute bool
 	searchFunc func(*vector.Vector) int
+
+	tableName string
 }
 
 type blockMergeReader struct {

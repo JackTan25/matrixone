@@ -128,6 +128,7 @@ func (r *blockReader) Read(ctx context.Context, cols []string,
 	}
 
 	logutil.Debug(testutil.OperatorCatchBatch("block reader", bat))
+	fmt.Println("BlockReader read rows: ", bat.Length())
 	return bat, nil
 }
 
