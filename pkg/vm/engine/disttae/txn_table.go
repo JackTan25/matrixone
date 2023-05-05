@@ -844,6 +844,7 @@ func (tbl *txnTable) newBlockReader(ctx context.Context, num int, expr *plan.Exp
 				ts:         ts,
 				ctx:        ctx,
 				blks:       []*catalog.BlockInfo{blks[i]},
+				tableName:  tbl.tableName,
 			}
 		}
 		for j := len(ranges); j < num; j++ {
@@ -856,6 +857,7 @@ func (tbl *txnTable) newBlockReader(ctx context.Context, num int, expr *plan.Exp
 	blockReaders := newBlockReaders(ctx, tbl.db.txn.engine.fs, tableDef, tbl.primaryIdx, ts, num, expr)
 	distributeBlocksToBlockReaders(blockReaders, num, infos, steps)
 	for i := 0; i < num; i++ {
+		blockReaders[i].tableName = tbl.tableName
 		rds[i] = blockReaders[i]
 	}
 	return rds, nil
