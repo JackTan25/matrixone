@@ -269,6 +269,7 @@ func (tbl *txnTable) Ranges(ctx context.Context, expr *plan.Expr) (ranges [][]by
 		if len(blocks) > 0 {
 			ts := tbl.db.txn.meta.SnapshotTS
 			ids := make([]types.Blockid, len(blocks))
+			appendIds := make([]types.Blockid, len(blocks))
 			for i := range blocks {
 				// if cn can see a appendable block, this block must contain all updates
 				// in cache, no need to do merge read, BlockRead will filter out
@@ -276,10 +277,15 @@ func (tbl *txnTable) Ranges(ctx context.Context, expr *plan.Expr) (ranges [][]by
 				if !blocks[i].EntryState {
 					if blocks[i].CommitTs.ToTimestamp().Less(ts) { // hack
 						ids[i] = blocks[i].BlockID
+					} else {
+						appendIds = append(appendIds, blocks[i].BlockID)
 					}
 				}
 			}
-
+			// non-append -> flush-deletes -- yes
+			// non-append -> raw-deletes  -- yes
+			// append     -> raw-deletes -- yes
+			// append     -> flush-deletes -- yes
 			for _, blockID := range ids {
 				ts := types.TimestampToTS(ts)
 				iter := parts[i].NewRowsIter(ts, &blockID, true)
@@ -304,8 +310,16 @@ func (tbl *txnTable) Ranges(ctx context.Context, expr *plan.Expr) (ranges [][]by
 					}
 				}
 			}
+			// add append-block flush-deletes
+			for _, blockID := range appendIds {
+				// DN flush deletes rowids block
+				if err = tbl.LoadDeletesForBlock(string(blockID[:]), deletes, nil); err != nil {
+					return
+				}
+			}
 			for i := range blocks {
 				if _, ok := deletes[blocks[i].BlockID]; !ok {
+					// blks records the blocks which are never deleted ones
 					blks = append(blks, blocks[i])
 				}
 			}
