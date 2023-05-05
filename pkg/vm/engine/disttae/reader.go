@@ -107,6 +107,7 @@ func (r *blockReader) Read(ctx context.Context, cols []string,
 
 	// if it's not sorted, just return
 	if !r.blks[0].Sorted || r.pkidxInColIdxs == -1 || r.expr == nil {
+		fmt.Println("BlockReader read rows: ", bat.Length(), " info ", info.EntryState, " MyBlockId is ", r.blks[0].BlockID.String())
 		return bat, nil
 	}
 
