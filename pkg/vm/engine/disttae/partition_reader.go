@@ -261,7 +261,7 @@ func (p *PartitionReader) Read(ctx context.Context, colNames []string, expr *pla
 			if name == catalog.Row_ID {
 				blockId := entry.RowID.GetBlockid()
 				if p.tableName == "t_delete" {
-					fmt.Println("t_delete partiiton memory: I give you the rowId's blockId: ", blockId.String())
+					fmt.Println("t_delete partiiton memory: I give you the rowId's blockId: ", blockId.String(), " rowId is ", entry.RowID.String())
 				}
 				if err := vector.AppendFixed(b.Vecs[i], entry.RowID, false, mp); err != nil {
 					return nil, err

@@ -204,7 +204,7 @@ func (tbl *txnTable) LoadDeletesForBlock(blockID string, deleteBlockId map[types
 					deleteBlockId[id] = append(deleteBlockId[id], int(offset))
 				} else if deletesRowId != nil {
 					blkId := rowId.GetBlockid()
-					fmt.Println("I give BlockId to deletes: ", blkId.String())
+					fmt.Println("I give BlockId to deletes: ", blkId.String(), " rowId is ", rowId.String())
 					deletesRowId[rowId] = 0
 				} else {
 					panic("Load Block Deletes Error")
