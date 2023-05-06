@@ -189,7 +189,7 @@ func (c *client) NewStream(backend string, lock bool) (Stream, error) {
 }
 
 func (c *client) Ping(ctx context.Context, backend string) error {
-	b, err := c.getBackend(backend, false)
+	b, err := c.getBackend(backend, true)
 	if err != nil {
 		return err
 	}
