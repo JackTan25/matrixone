@@ -17,7 +17,9 @@ package db
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math/rand"
+	"net"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -6074,4 +6076,9 @@ func TestCommitS3Blocks(t *testing.T) {
 		assert.Error(t, err)
 		assert.NoError(t, txn.Commit())
 	}
+}
+
+func TestPing(t *testing.T) {
+	address := net.ParseIP("nightly-regression-dis-tp-cn-0.nightly-regression-dis-tp-cn-headless.mo-nightly-regression.svc")
+	fmt.Println(address)
 }

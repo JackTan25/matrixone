@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
 	"runtime"
 	"sort"
 	"strings"
@@ -426,11 +425,6 @@ func (c *Compile) compileQuery(ctx context.Context, qry *plan.Query) ([]*Scope, 
 			logutil.Infof("test eks: addrs ", c.cnList[i].Addr)
 			if len(addrs) != 2 {
 				logutil.Warnf("compileScope received a malformed cn address '%s', expected 'ip:port'", c.cnList[i].Addr)
-			}
-			// InValid Addr, this should be docker addr,
-			// "cn-0","cn-1", just skip it
-			if address := net.ParseIP(addrs[0]); address == nil {
-				continue
 			}
 			if isSameCN(c.addr, c.cnList[i].Addr) {
 				continue
