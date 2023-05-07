@@ -429,9 +429,12 @@ func (c *Compile) compileQuery(ctx context.Context, qry *plan.Query) ([]*Scope, 
 			if isSameCN(c.addr, c.cnList[i].Addr) {
 				continue
 			}
+
 			err := client.Ping(ctx, c.cnList[i].Addr)
+
 			// ping failed
 			if err != nil {
+				fmt.Printf("ping err %+v\n", err)
 				c.cnList = append(c.cnList[:i], c.cnList[i+1:]...)
 				i--
 			}
