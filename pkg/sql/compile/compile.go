@@ -429,7 +429,7 @@ func (c *Compile) compileQuery(ctx context.Context, qry *plan.Query) ([]*Scope, 
 			if isSameCN(c.addr, c.cnList[i].Addr) {
 				continue
 			}
-
+			logutil.Infof("ping start")
 			err := client.Ping(ctx, c.cnList[i].Addr)
 			logutil.Infof("ping err %+v\n", err)
 			// ping failed
