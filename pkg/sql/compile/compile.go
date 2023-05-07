@@ -431,7 +431,7 @@ func (c *Compile) compileQuery(ctx context.Context, qry *plan.Query) ([]*Scope, 
 			}
 
 			err := client.Ping(ctx, c.cnList[i].Addr)
-
+			logutil.Infof("ping err %+v\n", err)
 			// ping failed
 			if err != nil {
 				fmt.Printf("ping err %+v\n", err)
