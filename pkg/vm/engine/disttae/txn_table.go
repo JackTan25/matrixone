@@ -241,8 +241,10 @@ func (tbl *txnTable) reset(newId uint64) {
 // return all unmodified blocks
 func (tbl *txnTable) Ranges(ctx context.Context, expr *plan.Expr) (ranges [][]byte, err error) {
 	tbl.db.txn.Lock()
+	tbl.db.txn.DumpBatch(false, 0)
 	tbl.writes = tbl.writes[:0]
 	tbl.writesOffset = len(tbl.db.txn.writes)
+
 	for i, entry := range tbl.db.txn.writes {
 		if entry.databaseId != tbl.db.databaseId {
 			continue
@@ -553,8 +555,8 @@ func (tbl *txnTable) Write(ctx context.Context, bat *batch.Batch) error {
 	if err := tbl.updateLocalState(ctx, INSERT, ibat, packer); err != nil {
 		return err
 	}
-	return nil
-	// return tbl.db.txn.DumpBatch(false, tbl.writesOffset)
+
+	return tbl.db.txn.DumpBatch(false, tbl.writesOffset)
 }
 
 func (tbl *txnTable) Update(ctx context.Context, bat *batch.Batch) error {
