@@ -67,7 +67,7 @@ import (
 const (
 	DistributedThreshold   uint64 = 10 * mpool.MB
 	SingleLineSizeEstimate uint64 = 300 * mpool.B
-	ValueScanThreshold     int    = 1 * mpool.GB
+	ValueScanThreshold     int    = 30 * mpool.MB
 )
 
 // New is used to new an object of compile
