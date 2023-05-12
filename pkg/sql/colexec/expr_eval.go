@@ -148,6 +148,10 @@ func getConstVecInList(ctx context.Context, proc *process.Process, exprs []*plan
 	return vec, nil
 }
 
+func GetConstVec(ctx context.Context, proc *process.Process, expr *plan.Expr, length int) (*vector.Vector, error) {
+	return getConstVec(ctx, proc, expr, length)
+}
+
 func getConstVec(ctx context.Context, proc *process.Process, expr *plan.Expr, length int) (*vector.Vector, error) {
 	var vec *vector.Vector
 	t := expr.Expr.(*plan.Expr_C)
@@ -726,6 +730,10 @@ func JoinFilterEvalExprInBucket(r, s *batch.Batch, rRow, sRow int, proc *process
 		// *plan.Expr_Corr, *plan.Expr_List, *plan.Expr_P, *plan.Expr_V, *plan.Expr_Sub
 		return nil, moerr.NewNYI(proc.Ctx, fmt.Sprintf("eval expr '%v'", t))
 	}
+}
+
+func EvalFunction(proc *process.Process, f *function.Function, args []*vector.Vector, length int) (*vector.Vector, error) {
+	return evalFunction(proc, f, args, length)
 }
 
 func evalFunction(proc *process.Process, f *function.Function, args []*vector.Vector, length int) (*vector.Vector, error) {
