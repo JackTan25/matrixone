@@ -39,6 +39,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
+	"github.com/matrixorigin/matrixone/pkg/container/nulls"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/defines"
@@ -67,7 +68,7 @@ import (
 const (
 	DistributedThreshold   uint64 = 10 * mpool.MB
 	SingleLineSizeEstimate uint64 = 300 * mpool.B
-	ValueScanThreshold     int    = 30 * mpool.MB
+	ValueScanThreshold     int    = int(colexec.WriteS3Threshold / 2)
 )
 
 // New is used to new an object of compile
@@ -2349,6 +2350,66 @@ func isSameCN(addr string, currentCNAddr string) bool {
 	return parts1[0] == parts2[0]
 }
 
+func appendConstData(vec *vector.Vector, constVar *plan.Expr_C, expr *plan.Expr, ctx context.Context, typ types.Type, proc *process.Process) error {
+	if constVar.C.GetIsnull() {
+		if typ.IsVarlen() {
+			vector.AppendBytes(vec, nil, true, proc.Mp())
+		} else {
+			nulls.Add(vec.GetNulls(), uint64(vec.Length()))
+		}
+		return nil
+	}
+	switch typ.Oid {
+	case types.T_bool:
+		vector.AppendFixed(vec, constVar.C.GetBval(), false, proc.Mp())
+	case types.T_int8:
+		vector.AppendFixed(vec, constVar.C.GetI8Val(), false, proc.Mp())
+	case types.T_int16:
+		vector.AppendFixed(vec, constVar.C.GetI16Val(), false, proc.Mp())
+	case types.T_int32:
+		vector.AppendFixed(vec, constVar.C.GetI32Val(), false, proc.Mp())
+	case types.T_int64:
+		vector.AppendFixed(vec, constVar.C.GetI64Val(), false, proc.Mp())
+	case types.T_uint8:
+		vector.AppendFixed(vec, constVar.C.GetU8Val(), false, proc.Mp())
+	case types.T_uint16:
+		vector.AppendFixed(vec, constVar.C.GetU16Val(), false, proc.Mp())
+	case types.T_uint32:
+		vector.AppendFixed(vec, constVar.C.GetU32Val(), false, proc.Mp())
+	case types.T_uint64:
+		vector.AppendFixed(vec, constVar.C.GetU64Val(), false, proc.Mp())
+	case types.T_float32:
+		vector.AppendFixed(vec, constVar.C.GetFval(), false, proc.Mp())
+	case types.T_float64:
+		vector.AppendFixed(vec, constVar.C.GetFval(), false, proc.Mp())
+	case types.T_char, types.T_varchar, types.T_binary, types.T_varbinary, types.T_json, types.T_blob, types.T_text:
+		vector.AppendBytes(vec, []byte(constVar.C.GetSval()), false, proc.Mp())
+	case types.T_date:
+		vector.AppendFixed(vec, types.Date(constVar.C.GetDateval()), false, proc.Mp())
+	case types.T_datetime:
+		vector.AppendFixed(vec, types.Datetime(constVar.C.GetDatetimeval()), false, proc.Mp())
+	case types.T_time:
+		vector.AppendFixed(vec, types.Time(constVar.C.GetTimeval()), false, proc.Mp())
+	case types.T_timestamp:
+		scale := expr.Typ.Scale
+		if scale < 0 || scale > 6 {
+			return moerr.NewInternalError(proc.Ctx, "invalid timestamp scale")
+		}
+		vector.AppendFixed(vec, types.Timestamp(constVar.C.GetTimestampval()), false, proc.Mp())
+	case types.T_decimal64:
+		cd64 := constVar.C.GetDecimal64Val()
+		d64 := types.Decimal64(cd64.A)
+		vector.AppendFixed(vec, d64, false, proc.Mp())
+	case types.T_decimal128:
+		cd128 := constVar.C.GetDecimal128Val()
+		d128 := types.Decimal128{B0_63: uint64(cd128.A), B64_127: uint64(cd128.B)}
+		vector.AppendFixed(vec, d128, false, proc.Mp())
+	default:
+		return moerr.NewNYI(ctx, fmt.Sprintf("expression %v can not eval to constant and append to rowsetData", constVar.C.GetValue()))
+	}
+	return nil
+}
+
 func rowsetDataToVector(ctx context.Context, proc *process.Process, exprs []*plan.Expr) (*vector.Vector, error) {
 	rowCount := len(exprs)
 	if rowCount == 0 {
@@ -2370,8 +2431,16 @@ func rowsetDataToVector(ctx context.Context, proc *process.Process, exprs []*pla
 	bat := batch.NewWithSize(0)
 	bat.Zs = []int64{1}
 	defer bat.Clean(proc.Mp())
-
+	// for like: insert into t values (1,1),(2,2)
+	// const data,no need to EvalExpr
 	for _, e := range exprs {
+		constVar, ok := e.Expr.(*plan.Expr_C)
+		if ok {
+			if err := appendConstData(vec, constVar, e, ctx, typ, proc); err != nil {
+				return nil, err
+			}
+			continue
+		}
 		tmp, err := colexec.EvalExpr(bat, proc, e)
 		if err != nil {
 			return nil, err
