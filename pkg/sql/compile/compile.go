@@ -27,6 +27,7 @@ import (
 
 	"github.com/matrixorigin/matrixone/pkg/cnservice/cnclient"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/dispatch"
+	"github.com/matrixorigin/matrixone/pkg/sql/plan/function"
 
 	"github.com/matrixorigin/matrixone/pkg/perfcounter"
 
@@ -2350,7 +2351,8 @@ func isSameCN(addr string, currentCNAddr string) bool {
 	return parts1[0] == parts2[0]
 }
 
-func appendConstData(vec *vector.Vector, constVar *plan.Expr_C, expr *plan.Expr, ctx context.Context, typ types.Type, proc *process.Process) error {
+func appendConstData(vec *vector.Vector, constVar *plan.Expr_C, expr *plan.Expr, ctx context.Context, proc *process.Process) error {
+	typ := vec.GetType()
 	if constVar.C.GetIsnull() {
 		if typ.IsVarlen() {
 			vector.AppendBytes(vec, nil, true, proc.Mp())
@@ -2431,16 +2433,46 @@ func rowsetDataToVector(ctx context.Context, proc *process.Process, exprs []*pla
 	bat := batch.NewWithSize(0)
 	bat.Zs = []int64{1}
 	defer bat.Clean(proc.Mp())
+
 	// for like: insert into t values (1,1),(2,2)
 	// const data,no need to EvalExpr
+	var isConst bool
+	var constVar *plan.Expr_C
+	var initConstVector bool
+	var leftConstVector *vector.Vector
+	var f *function.Function
 	for _, e := range exprs {
-		constVar, ok := e.Expr.(*plan.Expr_C)
-		if ok {
-			if err := appendConstData(vec, constVar, e, ctx, typ, proc); err != nil {
-				return nil, err
+		castFunc, ok := e.Expr.(*plan.Expr_F)
+		// 1. make sure it's a cast_func
+		if ok && castFunc.F.Func.ObjName == "cast" {
+			constVar, isConst = castFunc.F.Args[0].Expr.(*plan.Expr_C)
+			// _, isConst = castFunc.F.Args[0].Expr.(*plan.Expr_C)
+		}
+		// 2. make sure the firstArg of cast func is a ConstVar
+		if ok && isConst {
+			if !initConstVector {
+				var err error
+				leftConstVector, err = colexec.GetConstVec(ctx, proc, castFunc.F.Args[0], 1)
+				// _, err = colexec.GetConstVec(ctx, proc, castFunc.F.Args[0], 1)
+				if err != nil {
+					return nil, err
+				}
+				leftConstVector.SetClass(vector.FLAT)
+				initConstVector = true
+				fid := castFunc.F.GetFunc().GetObj()
+				f, err = function.GetFunctionByID(proc.Ctx, fid)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				// 3. append
+				if err := appendConstData(leftConstVector, constVar, castFunc.F.Args[0], ctx, proc); err != nil {
+					return nil, err
+				}
 			}
 			continue
 		}
+
 		tmp, err := colexec.EvalExpr(bat, proc, e)
 		if err != nil {
 			return nil, err
@@ -2493,6 +2525,14 @@ func rowsetDataToVector(ctx context.Context, proc *process.Process, exprs []*pla
 			return nil, moerr.NewNYI(ctx, fmt.Sprintf("expression %v can not eval to constant and append to rowsetData", e))
 		}
 		tmp.Free(proc.Mp())
+	}
+	if initConstVector {
+		// doCast and append const data
+		if result, err := colexec.EvalFunction(proc, f, []*vector.Vector{leftConstVector, vec}, leftConstVector.Length()); err != nil {
+			return nil, err
+		} else {
+			return result, nil
+		}
 	}
 	return vec, nil
 }
