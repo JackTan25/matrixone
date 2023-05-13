@@ -17,21 +17,31 @@ package parsers
 import (
 	"context"
 	"strings"
+	"sync"
 
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
-	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect/mysql"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect/postgresql"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
+	"github.com/matrixorigin/matrixone/pkg/util/toml"
 )
 
-const (
-	sqlSizeThreshold = 16 * mpool.MB
-)
+type SqlSizeConfig struct {
+	SqlSizeThreshold toml.ByteSize `toml:"sql-size-threshold"`
+}
+
+var onceInit sync.Once
+var sqlSizeThreshold int64
+
+func InitSqlSize(size int64) {
+	onceInit.Do(func() {
+		sqlSizeThreshold = size
+	})
+}
 
 func Parse(ctx context.Context, dialectType dialect.DialectType, sql string, lower int64) ([]tree.Statement, error) {
-	if len(sql) >= sqlSizeThreshold {
+	if len(sql) >= int(sqlSizeThreshold) {
 		return nil, moerr.NewInternalError(ctx, "type of dialect error")
 	}
 	switch dialectType {

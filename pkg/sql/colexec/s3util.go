@@ -15,6 +15,8 @@
 package colexec
 
 import (
+	"sync"
+
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
@@ -29,6 +31,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sort"
 	"github.com/matrixorigin/matrixone/pkg/sql/util"
+	"github.com/matrixorigin/matrixone/pkg/util/toml"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/blockio"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
@@ -69,13 +72,21 @@ type S3Writer struct {
 	ufs  []func(*vector.Vector, *vector.Vector, int64) error // function pointers for type conversion
 }
 
-const (
-	// WriteS3Threshold when batches'  size of table reaches this, we will
-	// trigger write s3
-	WriteS3Threshold uint64 = 64 * mpool.MB
+type S3SizeConfig struct {
+	WriteS3Threshold toml.ByteSize `toml:"write-s3-threshold"`
+	TagS3Size        toml.ByteSize `toml:"tag-s3-size"`
+}
 
-	TagS3Size uint64 = 10 * mpool.MB
-)
+var onceInit sync.Once
+var WriteS3Threshold uint64
+var TagS3Size uint64
+
+func InitS3Size(size1 uint64, size2 uint64) {
+	onceInit.Do(func() {
+		WriteS3Threshold = size1
+		TagS3Size = size2
+	})
+}
 
 func (w *S3Writer) Free(proc *process.Process) {
 	if w.metaLocBat != nil {

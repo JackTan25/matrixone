@@ -52,3 +52,10 @@ busy-queue-size = 1
 [cn.txn]
 enable-sacrificing-freshness = false
 enable-cn-based-consistency = true
+
+[sqlsizethreshold]
+sql-size-threshold = "16MB"
+
+[s3threshold]
+write-s3-threshold  = "64MB"
+tag-s3-size = "10MB"

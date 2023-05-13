@@ -17,7 +17,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"hash/fnv"
 	"math"
 	"net"
@@ -25,6 +24,10 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/matrixorigin/matrixone/pkg/objectio"
+	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
+	"github.com/matrixorigin/matrixone/pkg/sql/parsers"
 
 	"github.com/BurntSushi/toml"
 	"github.com/matrixorigin/matrixone/pkg/cnservice"
@@ -110,6 +113,12 @@ type Config struct {
 
 	// MetaCache the config for objectio metacache
 	MetaCache objectio.CacheConfig `toml:"metacache"`
+
+	// a sql string size limit
+	SqlSizeLimit parsers.SqlSizeConfig `toml:"sqlsizethreshold"`
+
+	// write s3 size config
+	S3SizeLimit colexec.S3SizeConfig `toml:"s3threshold"`
 }
 
 func parseConfigFromFile(file string, cfg any) error {
@@ -169,6 +178,17 @@ func (c *Config) initMetaCache() {
 	}
 }
 
+func (c *Config) initSqlSize() {
+	if c.SqlSizeLimit.SqlSizeThreshold > 0 {
+		parsers.InitSqlSize(int64(c.SqlSizeLimit.SqlSizeThreshold))
+	}
+}
+
+func (c *Config) initS3Size() {
+	if c.S3SizeLimit.TagS3Size > 0 && c.S3SizeLimit.WriteS3Threshold > 0 {
+		colexec.InitS3Size(uint64(c.S3SizeLimit.WriteS3Threshold), uint64(c.S3SizeLimit.TagS3Size))
+	}
+}
 func (c *Config) createFileService(defaultName string, perfCounterSet *perfcounter.CounterSet, serviceType metadata.ServiceType, nodeUUID string) (*fileservice.FileServices, error) {
 	// create all services
 	services := make([]fileservice.FileService, 0, len(c.FileServices))

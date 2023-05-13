@@ -69,7 +69,6 @@ import (
 const (
 	DistributedThreshold   uint64 = 10 * mpool.MB
 	SingleLineSizeEstimate uint64 = 300 * mpool.B
-	ValueScanThreshold     int    = int(colexec.WriteS3Threshold / 2)
 )
 
 // New is used to new an object of compile
@@ -680,15 +679,10 @@ func constructValueScanBatch(ctx context.Context, proc *process.Process, node *p
 	colsData := node.RowsetData.Cols
 	rowCount := len(colsData[0].Data)
 	bat := batch.NewWithSize(colCount)
-	size := 0
 	for i := 0; i < colCount; i++ {
 		vec, err := rowsetDataToVector(ctx, proc, colsData[i].Data)
 		if err != nil {
 			return nil, err
-		}
-		size += vec.Size()
-		if size > ValueScanThreshold {
-			return nil, moerr.NewInternalError(ctx, "insert values too large, can't over 1G")
 		}
 		bat.Vecs[i] = vec
 	}
@@ -2545,6 +2539,8 @@ func rowsetDataToVector(ctx context.Context, proc *process.Process, exprs []*pla
 		} else {
 			// FixMe: here the e is nil for appendToVector.
 			appendToVector(result, vec, proc, typ, ctx, nil)
+			result.Free(proc.GetMPool())
+			leftConstVector.Free(proc.GetMPool())
 		}
 	}
 	return vec, nil
