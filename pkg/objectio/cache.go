@@ -16,10 +16,11 @@ package objectio
 
 import (
 	"context"
+	"sync"
+
 	"github.com/matrixorigin/matrixone/pkg/fileservice"
 	"github.com/matrixorigin/matrixone/pkg/fileservice/objcache/lruobjcache"
 	"github.com/matrixorigin/matrixone/pkg/util/toml"
-	"sync"
 )
 
 type CacheConfig struct {

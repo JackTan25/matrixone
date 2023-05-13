@@ -186,6 +186,8 @@ func startCNService(
 	return stopper.RunNamedTask("cn-service", func(ctx context.Context) {
 		ctx = perfcounter.WithCounterSet(ctx, perfCounterSet)
 		cfg.initMetaCache()
+		cfg.initS3Size()
+		cfg.initSqlSize()
 		c := cfg.getCNServiceConfig()
 		s, err := cnservice.NewService(
 			&c,
