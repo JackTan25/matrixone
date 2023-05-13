@@ -16,15 +16,24 @@ package parsers
 
 import (
 	"context"
+	"strings"
+
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
+	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect/mysql"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/dialect/postgresql"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
-	"strings"
+)
+
+const (
+	sqlSizeThreshold = 16 * mpool.MB
 )
 
 func Parse(ctx context.Context, dialectType dialect.DialectType, sql string, lower int64) ([]tree.Statement, error) {
+	if len(sql) >= sqlSizeThreshold {
+		return nil, moerr.NewInternalError(ctx, "type of dialect error")
+	}
 	switch dialectType {
 	case dialect.MYSQL:
 		return mysql.Parse(ctx, sql, lower)

@@ -2475,6 +2475,52 @@ func appendConstData(vec *vector.Vector, constVar *plan.Expr_C, expr *plan.Expr,
 	return nil
 }
 
+func appendToVector(tmp *vector.Vector, vec *vector.Vector, proc *process.Process, typ types.Type, ctx context.Context, e *plan.Expr) error {
+	switch typ.Oid {
+	case types.T_bool:
+		vector.AppendFixedList(vec, vector.MustFixedCol[bool](tmp), nil, proc.Mp())
+	case types.T_int8:
+		vector.AppendFixedList(vec, vector.MustFixedCol[int8](tmp), nil, proc.Mp())
+	case types.T_int16:
+		vector.AppendFixedList(vec, vector.MustFixedCol[int16](tmp), nil, proc.Mp())
+	case types.T_int32:
+		vector.AppendFixedList(vec, vector.MustFixedCol[int32](tmp), nil, proc.Mp())
+	case types.T_int64:
+		vector.AppendFixedList(vec, vector.MustFixedCol[int64](tmp), nil, proc.Mp())
+	case types.T_uint8:
+		vector.AppendFixedList(vec, vector.MustFixedCol[uint8](tmp), nil, proc.Mp())
+	case types.T_uint16:
+		vector.AppendFixedList(vec, vector.MustFixedCol[uint16](tmp), nil, proc.Mp())
+	case types.T_uint32:
+		vector.AppendFixedList(vec, vector.MustFixedCol[uint32](tmp), nil, proc.Mp())
+	case types.T_uint64:
+		vector.AppendFixedList(vec, vector.MustFixedCol[uint64](tmp), nil, proc.Mp())
+	case types.T_float32:
+		vector.AppendFixedList(vec, vector.MustFixedCol[float32](tmp), nil, proc.Mp())
+	case types.T_float64:
+		vector.AppendFixedList(vec, vector.MustFixedCol[float64](tmp), nil, proc.Mp())
+	case types.T_char, types.T_varchar, types.T_binary, types.T_varbinary, types.T_json, types.T_blob, types.T_text:
+		vector.AppendBytesList(vec, vector.MustBytesCol(tmp), nil, proc.Mp())
+	case types.T_date:
+		vector.AppendFixedList(vec, vector.MustFixedCol[types.Date](tmp), nil, proc.Mp())
+	case types.T_datetime:
+		vector.AppendFixedList(vec, vector.MustFixedCol[types.Datetime](tmp), nil, proc.Mp())
+	case types.T_time:
+		vector.AppendFixedList(vec, vector.MustFixedCol[types.Time](tmp), nil, proc.Mp())
+	case types.T_timestamp:
+		vector.AppendFixedList(vec, vector.MustFixedCol[types.Timestamp](tmp), nil, proc.Mp())
+	case types.T_decimal64:
+		vector.AppendFixedList(vec, vector.MustFixedCol[types.Decimal64](tmp), nil, proc.Mp())
+	case types.T_decimal128:
+		vector.AppendFixedList(vec, vector.MustFixedCol[types.Decimal128](tmp), nil, proc.Mp())
+	case types.T_uuid:
+		vector.AppendFixedList(vec, vector.MustFixedCol[types.Uuid](tmp), nil, proc.Mp())
+	default:
+		return moerr.NewNYI(ctx, fmt.Sprintf("expression %v can not eval to constant and append to rowsetData", e))
+	}
+	return nil
+}
+
 func rowsetDataToVector(ctx context.Context, proc *process.Process, exprs []*plan.Expr) (*vector.Vector, error) {
 	rowCount := len(exprs)
 	if rowCount == 0 {
@@ -2501,35 +2547,39 @@ func rowsetDataToVector(ctx context.Context, proc *process.Process, exprs []*pla
 	// const data,no need to EvalExpr
 	var isConst bool
 	var constVar *plan.Expr_C
-	var initConstVector bool
-	var leftConstVector *vector.Vector
-	var f *function.Function
+	funcMap := make(map[int]*function.Function)
+	constVecMap := make(map[int]*vector.Vector)
 	for _, e := range exprs {
 		castFunc, ok := e.Expr.(*plan.Expr_F)
 		// 1. make sure it's a cast_func
 		if ok && castFunc.F.Func.ObjName == "cast" {
 			constVar, isConst = castFunc.F.Args[0].Expr.(*plan.Expr_C)
+			if isConst && constVar.C.Isnull {
+				isConst = false
+			}
 			// _, isConst = castFunc.F.Args[0].Expr.(*plan.Expr_C)
 		}
 		// 2. make sure the firstArg of cast func is a ConstVar
 		if ok && isConst {
-			if !initConstVector {
+			typId := int(castFunc.F.Args[0].Typ.Id)
+			if constVecMap[typId] == nil {
 				var err error
-				leftConstVector, err = colexec.GetConstVec(ctx, proc, castFunc.F.Args[0], 1)
+				leftConstVector, err := colexec.GetConstVec(ctx, proc, castFunc.F.Args[0], 1)
 				// _, err = colexec.GetConstVec(ctx, proc, castFunc.F.Args[0], 1)
 				if err != nil {
 					return nil, err
 				}
+				constVecMap[typId] = leftConstVector
 				leftConstVector.SetClass(vector.FLAT)
-				initConstVector = true
 				fid := castFunc.F.GetFunc().GetObj()
-				f, err = function.GetFunctionByID(proc.Ctx, fid)
+				f, err := function.GetFunctionByID(proc.Ctx, fid)
 				if err != nil {
 					return nil, err
 				}
+				funcMap[typId] = f
 			} else {
 				// 3. append
-				if err := appendConstData(leftConstVector, constVar, castFunc.F.Args[0], ctx, proc); err != nil {
+				if err := appendConstData(constVecMap[typId], constVar, castFunc.F.Args[0], ctx, proc); err != nil {
 					return nil, err
 				}
 			}
@@ -2545,56 +2595,19 @@ func rowsetDataToVector(ctx context.Context, proc *process.Process, exprs []*pla
 			tmp.Free(proc.Mp())
 			continue
 		}
-		switch typ.Oid {
-		case types.T_bool:
-			vector.AppendFixed(vec, vector.MustFixedCol[bool](tmp)[0], false, proc.Mp())
-		case types.T_int8:
-			vector.AppendFixed(vec, vector.MustFixedCol[int8](tmp)[0], false, proc.Mp())
-		case types.T_int16:
-			vector.AppendFixed(vec, vector.MustFixedCol[int16](tmp)[0], false, proc.Mp())
-		case types.T_int32:
-			vector.AppendFixed(vec, vector.MustFixedCol[int32](tmp)[0], false, proc.Mp())
-		case types.T_int64:
-			vector.AppendFixed(vec, vector.MustFixedCol[int64](tmp)[0], false, proc.Mp())
-		case types.T_uint8:
-			vector.AppendFixed(vec, vector.MustFixedCol[uint8](tmp)[0], false, proc.Mp())
-		case types.T_uint16:
-			vector.AppendFixed(vec, vector.MustFixedCol[uint16](tmp)[0], false, proc.Mp())
-		case types.T_uint32:
-			vector.AppendFixed(vec, vector.MustFixedCol[uint32](tmp)[0], false, proc.Mp())
-		case types.T_uint64:
-			vector.AppendFixed(vec, vector.MustFixedCol[uint64](tmp)[0], false, proc.Mp())
-		case types.T_float32:
-			vector.AppendFixed(vec, vector.MustFixedCol[float32](tmp)[0], false, proc.Mp())
-		case types.T_float64:
-			vector.AppendFixed(vec, vector.MustFixedCol[float64](tmp)[0], false, proc.Mp())
-		case types.T_char, types.T_varchar, types.T_binary, types.T_varbinary, types.T_json, types.T_blob, types.T_text:
-			vector.AppendBytes(vec, tmp.GetBytesAt(0), false, proc.Mp())
-		case types.T_date:
-			vector.AppendFixed(vec, vector.MustFixedCol[types.Date](tmp)[0], false, proc.Mp())
-		case types.T_datetime:
-			vector.AppendFixed(vec, vector.MustFixedCol[types.Datetime](tmp)[0], false, proc.Mp())
-		case types.T_time:
-			vector.AppendFixed(vec, vector.MustFixedCol[types.Time](tmp)[0], false, proc.Mp())
-		case types.T_timestamp:
-			vector.AppendFixed(vec, vector.MustFixedCol[types.Timestamp](tmp)[0], false, proc.Mp())
-		case types.T_decimal64:
-			vector.AppendFixed(vec, vector.MustFixedCol[types.Decimal64](tmp)[0], false, proc.Mp())
-		case types.T_decimal128:
-			vector.AppendFixed(vec, vector.MustFixedCol[types.Decimal128](tmp)[0], false, proc.Mp())
-		case types.T_uuid:
-			vector.AppendFixed(vec, vector.MustFixedCol[types.Uuid](tmp)[0], false, proc.Mp())
-		default:
-			return nil, moerr.NewNYI(ctx, fmt.Sprintf("expression %v can not eval to constant and append to rowsetData", e))
+		if err = appendToVector(tmp, vec, proc, typ, ctx, e); err != nil {
+			return nil, err
 		}
 		tmp.Free(proc.Mp())
 	}
-	if initConstVector {
+
+	for typId, leftConstVector := range constVecMap {
 		// doCast and append const data
-		if result, err := colexec.EvalFunction(proc, f, []*vector.Vector{leftConstVector, vec}, leftConstVector.Length()); err != nil {
+		if result, err := colexec.EvalFunction(proc, funcMap[typId], []*vector.Vector{leftConstVector, vec}, leftConstVector.Length()); err != nil {
 			return nil, err
 		} else {
-			return result, nil
+			// FixMe: here the e is nil for appendToVector.
+			appendToVector(result, vec, proc, typ, ctx, nil)
 		}
 	}
 	return vec, nil
