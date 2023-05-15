@@ -1070,7 +1070,9 @@ func (tbl *txnTable) newReader(
 		deletedBlocks:   txn.deletedBlocks,
 	}
 	readers[0] = partReader
-
+	for i := 1; i < readerNumber; i++ {
+		readers[i] = &emptyReader{}
+	}
 	return readers, nil
 }
 
