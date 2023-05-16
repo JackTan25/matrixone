@@ -490,6 +490,7 @@ func ModifyDecode(data []byte) (*ModifyBlockMeta, error) {
 	}
 	// load deleteLoc
 	size = int(types.DecodeInt32(data[pos : pos+4]))
+	pos += 4
 	modifyBlockMeta.cnDeleteLocations = make([]objectio.Location, 0, size)
 	for i := 0; i < size; i++ {
 		modifyBlockMeta.cnDeleteLocations = append(modifyBlockMeta.cnDeleteLocations, data[pos:pos+objectio.LocationLen])
