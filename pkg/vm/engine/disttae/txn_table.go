@@ -327,30 +327,13 @@ func (tbl *txnTable) rangesOnePart(
 ) (err error) {
 	deletes := make(map[types.Blockid][]int)
 
-	// append-block-id and no-append-block-id are all in visibleBlks
-	// no-need to distinct them
-	visibleBlks := make([]catalog.BlockInfo, 0, len(blocks))
-
-	for i := range blocks {
-		// if cn can see a appendable block, this block must contain all updates
-		// in cache, no need to do merge read, BlockRead will filter out
-		// invisible and deleted rows with respect to the timestamp
-		if blocks[i].EntryState {
-			visibleBlks = append(visibleBlks, blocks[i])
-		} else {
-			if blocks[i].CommitTs.ToTimestamp().Less(ts) { // hack
-				visibleBlks = append(visibleBlks, blocks[i])
-			}
-		}
-	}
-
 	// non-append -> flush-deletes -- yes
 	// non-append -> raw-deletes  -- yes
 	// append     -> raw-deletes -- yes
 	// append     -> flush-deletes -- yes
 
 	// add dn-memroy-deletes
-	for _, blk := range visibleBlks {
+	for _, blk := range blocks {
 		ts := types.TimestampToTS(ts)
 		iter := state.NewRowsIter(ts, &blk.BlockID, true)
 		for iter.Next() {
@@ -395,7 +378,7 @@ func (tbl *txnTable) rangesOnePart(
 	errCtx := errutil.ContextWithNoReport(ctx, true)
 	// for now, we have load all memory deletes (both partitionState deletes and txn_workspace memory deletes).
 	// and we need to add DN block flush deletes batch.
-	for _, blk := range visibleBlks {
+	for _, blk := range blocks {
 		need := true
 
 		// if expr is monotonic, we need evaluating expr for each block
