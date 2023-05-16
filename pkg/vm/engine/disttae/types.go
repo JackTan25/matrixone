@@ -433,8 +433,8 @@ type ModifyBlockMeta struct {
 	cnDeleteLocations []objectio.Location
 }
 
-func (info *ModifyBlockMeta) LoadFlushDeleteForBlockRead(ctx context.Context, fs fileservice.FileService, mp *mpool.MPool) error {
-	for _, location := range info.cnDeleteLocations {
+func (modifyBlockMeta *ModifyBlockMeta) LoadFlushDeleteForBlockRead(ctx context.Context, fs fileservice.FileService, mp *mpool.MPool) error {
+	for _, location := range modifyBlockMeta.cnDeleteLocations {
 		rowIdBat, err := blockio.LoadColumns(ctx, []uint16{0}, nil, fs, location, mp)
 		if err != nil {
 			return err
@@ -442,7 +442,7 @@ func (info *ModifyBlockMeta) LoadFlushDeleteForBlockRead(ctx context.Context, fs
 		rowIds := vector.MustFixedCol[types.Rowid](rowIdBat.GetVector(0))
 		for _, rowId := range rowIds {
 			_, offset := rowId.Decode()
-			info.cnRawBatchdeletes = append(info.cnRawBatchdeletes, int(offset))
+			modifyBlockMeta.cnRawBatchdeletes = append(modifyBlockMeta.cnRawBatchdeletes, int(offset))
 		}
 	}
 	return nil
