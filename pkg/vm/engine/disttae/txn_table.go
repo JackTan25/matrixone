@@ -326,6 +326,35 @@ func (tbl *txnTable) rangesOnePart(
 	proc *process.Process, // process of this transaction
 ) (err error) {
 	deletes := make(map[types.Blockid][]int)
+	ids := make([]catalog.BlockInfo, 0, len(blocks))
+
+	/*
+		`drop database if exists db1;
+		create database db1;
+		use db1;
+		drop table if exists t;
+		create table t (a int);
+		insert into t values (1), (2), (3), (4), (5);
+		select mo_ctl('dn', 'flush', 'db1.t');
+		select * from t;
+		delete from t where a in (1, 2, 3);
+		begin;
+		select mo_ctl('dn', 'flush', 'db1.t');
+		select * from t;`
+		Look above:
+			if we don't do below process,we will get deletes from the partitionState, this is a
+			bug. So we need to skip this as a hack logic.
+	*/
+	for i := range blocks {
+		// if cn can see a appendable block, this block must contain all updates
+		// in cache, no need to do merge read, BlockRead will filter out
+		// invisible and deleted rows with respect to the timestamp
+		if !blocks[i].EntryState {
+			if blocks[i].CommitTs.ToTimestamp().Less(ts) { // hack
+				ids = append(ids, blocks[i])
+			}
+		}
+	}
 
 	// non-append -> flush-deletes -- yes
 	// non-append -> raw-deletes  -- yes
@@ -333,7 +362,7 @@ func (tbl *txnTable) rangesOnePart(
 	// append     -> flush-deletes -- yes
 
 	// add dn-memroy-deletes
-	for _, blk := range blocks {
+	for _, blk := range ids {
 		ts := types.TimestampToTS(ts)
 		iter := state.NewRowsIter(ts, &blk.BlockID, true)
 		for iter.Next() {
