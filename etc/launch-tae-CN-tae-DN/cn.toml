@@ -57,5 +57,5 @@ enable-cn-based-consistency = true
 sql-size-threshold = "16MB"
 
 [s3threshold]
-write-s3-threshold  = "64MB"
-tag-s3-size = "10MB"
+write-s3-threshold  = "24MB"
+tag-s3-size = "2MB"
