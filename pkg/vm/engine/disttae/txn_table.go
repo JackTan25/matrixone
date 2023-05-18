@@ -345,16 +345,16 @@ func (tbl *txnTable) rangesOnePart(
 			if we don't do below process,we will get deletes from the partitionState, this is a
 			bug. So we need to skip this as a hack logic.
 	*/
-	for i := range blocks {
-		// if cn can see a appendable block, this block must contain all updates
-		// in cache, no need to do merge read, BlockRead will filter out
-		// invisible and deleted rows with respect to the timestamp
-		if !blocks[i].EntryState {
-			if blocks[i].CommitTs.ToTimestamp().Less(ts) { // hack
-				ids = append(ids, blocks[i])
-			}
-		}
-	}
+	// for i := range blocks {
+	// 	// if cn can see a appendable block, this block must contain all updates
+	// 	// in cache, no need to do merge read, BlockRead will filter out
+	// 	// invisible and deleted rows with respect to the timestamp
+	// 	if !blocks[i].EntryState {
+	// 		if blocks[i].CommitTs.ToTimestamp().Less(ts) { // hack
+	// 			ids = append(ids, blocks[i])
+	// 		}
+	// 	}
+	// }
 
 	// non-append -> flush-deletes -- yes
 	// non-append -> raw-deletes  -- yes

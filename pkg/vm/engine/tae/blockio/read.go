@@ -136,6 +136,16 @@ func BlockReadInner(
 		sort.Slice(deletedRows, func(i, j int) bool {
 			return deletedRows[i] < deletedRows[j]
 		})
+		// do de-duplicate rowOffset
+		rows := deletedRows[:0]
+		for i := 0; i < len(deletedRows); i++ {
+			if len(rows) == 0 {
+				rows = append(rows, deletedRows[i])
+			} else if rows[len(rows)-1] != deletedRows[i] {
+				rows = append(rows, deletedRows[i])
+			}
+		}
+		deletedRows = deletedRows[:len(rows)]
 	}
 
 	result = batch.NewWithSize(len(loaded.Vecs))
