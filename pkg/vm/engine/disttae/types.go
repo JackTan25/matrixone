@@ -26,6 +26,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/fileservice"
+	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/matrixorigin/matrixone/pkg/pb/metadata"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/pb/timestamp"
@@ -34,6 +35,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/disttae/cache"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/disttae/logtailreplay"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/blockio"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
@@ -255,12 +257,11 @@ type txnTable struct {
 	dnList    []int
 	db        *txnDatabase
 	//	insertExpr *plan.Expr
-	defs           []engine.TableDef
-	tableDef       *plan.TableDef
-	seqnums        []uint16
-	typs           []types.Type
-	_parts         []*logtailreplay.PartitionState
-	modifiedBlocks [][]ModifyBlockMeta
+	defs     []engine.TableDef
+	tableDef *plan.TableDef
+	seqnums  []uint16
+	typs     []types.Type
+	_parts   []*logtailreplay.PartitionState
 
 	// blockInfos stores all the block infos for this table of this transaction
 	// it is only generated when the table is not created by this transaction
@@ -327,7 +328,7 @@ type column struct {
 }
 
 type blockReader struct {
-	blks          []*catalog.BlockInfo
+	blks          []*ModifyBlockMeta
 	ctx           context.Context
 	fs            fileservice.FileService
 	ts            timestamp.Timestamp
@@ -336,7 +337,7 @@ type blockReader struct {
 	expr          *plan.Expr
 
 	//used for prefetch
-	infos           [][]*catalog.BlockInfo
+	infos           [][]*ModifyBlockMeta
 	steps           []int
 	currentStep     int
 	prefetchColIdxs []uint16 //need to remove rowid
@@ -353,19 +354,19 @@ type blockReader struct {
 	searchFunc func(*vector.Vector) int
 }
 
-type blockMergeReader struct {
-	sels     []int64
-	blks     []ModifyBlockMeta
-	ctx      context.Context
-	fs       fileservice.FileService
-	ts       timestamp.Timestamp
-	tableDef *plan.TableDef
+// type blockMergeReader struct {
+// 	sels     []int64
+// 	blks     []ModifyBlockMeta
+// 	ctx      context.Context
+// 	fs       fileservice.FileService
+// 	ts       timestamp.Timestamp
+// 	tableDef *plan.TableDef
 
-	// cached meta data.
-	seqnums  []uint16
-	colTypes []types.Type
-	colNulls []bool
-}
+// 	// cached meta data.
+// 	seqnums  []uint16
+// 	colTypes []types.Type
+// 	colNulls []bool
+// }
 
 type mergeReader struct {
 	rds []engine.Reader
@@ -425,8 +426,77 @@ func (z *Zonemap) Unmarshal(data []byte) error {
 }
 
 type ModifyBlockMeta struct {
-	meta    catalog.BlockInfo
-	deletes []int
+	meta catalog.BlockInfo
+	// cn's deletes which is held in memory
+	cnRawBatchdeletes []int
+	// cn's deletes which is held in disk
+	cnDeleteLocations []objectio.Location
+}
+
+func (modifyBlockMeta *ModifyBlockMeta) LoadFlushDeleteForBlockRead(ctx context.Context, fs fileservice.FileService, mp *mpool.MPool) error {
+	for _, location := range modifyBlockMeta.cnDeleteLocations {
+		rowIdBat, err := blockio.LoadColumns(ctx, []uint16{0}, nil, fs, location, mp)
+		if err != nil {
+			return err
+		}
+		rowIds := vector.MustFixedCol[types.Rowid](rowIdBat.GetVector(0))
+		for _, rowId := range rowIds {
+			_, offset := rowId.Decode()
+			modifyBlockMeta.cnRawBatchdeletes = append(modifyBlockMeta.cnRawBatchdeletes, int(offset))
+		}
+	}
+	return nil
+}
+
+func (modifyBlockMeta *ModifyBlockMeta) ModifyEncode() []byte {
+	bytes := make([]byte, 0, (4+int(catalog.BlockInfoSize))+(4+8*len(modifyBlockMeta.cnRawBatchdeletes)+(4+len(modifyBlockMeta.cnDeleteLocations)*objectio.LocationLen)))
+	// append (meta  catalog.BlockInfo) => size + bytes
+	metaBytes := catalog.EncodeBlockInfo(modifyBlockMeta.meta)
+	size := int32(len(metaBytes))
+	bytes = append(bytes, types.EncodeInt32(&size)...)
+	bytes = append(bytes, metaBytes...)
+	// append (cnRawBatchdeletes []int64) => size + bytes
+	size = int32(len(modifyBlockMeta.cnRawBatchdeletes))
+	bytes = append(bytes, types.EncodeInt32(&size)...)
+	for i := range modifyBlockMeta.cnRawBatchdeletes {
+		offset := int64(modifyBlockMeta.cnRawBatchdeletes[i])
+		bytes = append(bytes, types.EncodeInt64(&offset)...)
+	}
+	// append (cnDeleteLocations []objectio.Location) => size + bytes
+	size = int32(len(modifyBlockMeta.cnDeleteLocations))
+	bytes = append(bytes, types.EncodeInt32(&size)...)
+	for i := range modifyBlockMeta.cnDeleteLocations {
+		bytes = append(bytes, modifyBlockMeta.cnDeleteLocations[i]...)
+	}
+	return bytes
+}
+
+func ModifyDecode(data []byte) (*ModifyBlockMeta, error) {
+	var size int
+	modifyBlockMeta := &ModifyBlockMeta{}
+	// load meta
+	pos := 0
+	size = int(types.DecodeInt32(data[pos : pos+4]))
+	pos += 4
+	modifyBlockMeta.meta = *catalog.DecodeBlockInfo(data[pos : pos+size])
+	// load deletes
+	pos += size
+	size = int(types.DecodeInt32(data[pos : pos+4]))
+	modifyBlockMeta.cnRawBatchdeletes = make([]int, 0, size)
+	pos += 4
+	for i := 0; i < size; i++ {
+		modifyBlockMeta.cnRawBatchdeletes = append(modifyBlockMeta.cnRawBatchdeletes, int(types.DecodeInt64(data[pos:pos+8])))
+		pos += 8
+	}
+	// load deleteLoc
+	size = int(types.DecodeInt32(data[pos : pos+4]))
+	pos += 4
+	modifyBlockMeta.cnDeleteLocations = make([]objectio.Location, 0, size)
+	for i := 0; i < size; i++ {
+		modifyBlockMeta.cnDeleteLocations = append(modifyBlockMeta.cnDeleteLocations, data[pos:pos+objectio.LocationLen])
+		pos += objectio.LocationLen
+	}
+	return modifyBlockMeta, nil
 }
 
 type Columns []column
