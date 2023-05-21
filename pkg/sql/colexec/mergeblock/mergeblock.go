@@ -15,6 +15,7 @@ package mergeblock
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
@@ -77,12 +78,14 @@ func Call(idx int, proc *process.Process, arg any, isFirst bool, isLast bool) (b
 	// handle origin/main table.
 	if ap.container.mp[0].Length() > 0 {
 		//batches in mp will be deeply copied into txn's workspace.
+		fmt.Printf("write metaLoc batch: %d\n", bat.Length())
 		if err = ap.Tbl.Write(proc.Ctx, ap.container.mp[0]); err != nil {
 			return false, err
 		}
 	}
 
 	for _, bat := range ap.container.mp2[0] {
+		fmt.Printf("write normal batch: %d\n", bat.Length())
 		//batches in mp2 will be deeply copied into txn's workspace.
 		if err = ap.Tbl.Write(proc.Ctx, bat); err != nil {
 			return false, err
