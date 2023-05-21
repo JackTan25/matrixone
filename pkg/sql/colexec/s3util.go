@@ -337,6 +337,8 @@ func (w *S3Writer) SortAndFlush(proc *process.Process) error {
 			sortIdx = w.sortIndex
 		}
 	}
+	now := time.Now()
+	fmt.Printf("sortFlush begin: %s, uuid: %s", now.String(), w.Uuid_str)
 	// just write ahead, no need to sort
 	if sortIdx == -1 {
 		if _, err := w.generateWriter(proc); err != nil {
@@ -441,6 +443,7 @@ func (w *S3Writer) SortAndFlush(proc *process.Process) error {
 		w.Batsize -= uint64(w.Bats[i].Size())
 	}
 	w.Bats = w.Bats[:0]
+	fmt.Printf("sortFlush finish: %s,uuid_str: %s", time.Since(now).String(), w.Uuid_str)
 	return nil
 }
 

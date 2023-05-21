@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -138,7 +139,9 @@ func (txn *Transaction) DumpBatch(force bool, offset int) error {
 	if mp == nil {
 		return nil
 	}
-	fmt.Printf("dumpBatch begin: %s", time.Now().String())
+	uid := uuid.NewString()
+	now := time.Now()
+	fmt.Printf("dumpBatch begin: %s,uuid: %s", now.String(), uid)
 	for key := range mp {
 		s3Writer, tbl, err := txn.getS3Writer(key)
 		if err != nil {
@@ -170,7 +173,7 @@ func (txn *Transaction) DumpBatch(force bool, offset int) error {
 		}
 	}
 	txn.workspaceSize -= size
-	fmt.Printf("dumpBatch end: %s", time.Now().String())
+	fmt.Printf("dumpBatch end: %s,cost time: %s,uuid: %s", time.Now().String(), time.Since(now).String(), uid)
 	return nil
 }
 
