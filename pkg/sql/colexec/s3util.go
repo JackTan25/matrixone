@@ -16,6 +16,7 @@ package colexec
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
@@ -350,9 +351,9 @@ func (w *S3Writer) SortAndFlush(proc *process.Process) error {
 		if err := w.writeEndBlocks(proc); err != nil {
 			return err
 		}
-		fmt.Printf("batchSize: %d,normal flush: %s\n", w.Batsize, w.Uuid_str)
+		fmt.Printf("batchSize: %d,normal flush: %s,time is: %s\n", w.Batsize, w.Uuid_str, time.Now().String())
 	} else {
-		fmt.Printf("batchSize: %d,merge flush: %s\n", w.Batsize, w.Uuid_str)
+		fmt.Printf("batchSize: %d,merge flush: %s,time is: %s\n", w.Batsize, w.Uuid_str, time.Now().String())
 		var merge MergeInterface
 		var nulls []*nulls.Nulls
 		for i := 0; i < len(w.Bats); i++ {

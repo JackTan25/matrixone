@@ -138,7 +138,7 @@ func (txn *Transaction) DumpBatch(force bool, offset int) error {
 	if mp == nil {
 		return nil
 	}
-
+	fmt.Printf("dumpBatch begin: %s", time.Now().String())
 	for key := range mp {
 		s3Writer, tbl, err := txn.getS3Writer(key)
 		if err != nil {
@@ -170,6 +170,7 @@ func (txn *Transaction) DumpBatch(force bool, offset int) error {
 		}
 	}
 	txn.workspaceSize -= size
+	fmt.Printf("dumpBatch end: %s", time.Now().String())
 	return nil
 }
 
