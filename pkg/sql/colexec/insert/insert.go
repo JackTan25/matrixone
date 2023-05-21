@@ -16,9 +16,11 @@ package insert
 
 import (
 	"bytes"
+	"fmt"
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
@@ -38,6 +40,7 @@ func Prepare(_ *process.Process, arg any) error {
 	ap := arg.(*Argument)
 	ap.ctr = new(container)
 	ap.ctr.state = Process
+	ap.ctr.uuid_str = uuid.NewString()
 	if ap.IsRemote {
 		s3Writers, err := colexec.AllocS3Writers(ap.InsertCtx.TableDef)
 		if err != nil {
@@ -49,6 +52,8 @@ func Prepare(_ *process.Process, arg any) error {
 }
 
 func Call(idx int, proc *process.Process, arg any, _ bool, _ bool) (bool, error) {
+	t_start := time.Now()
+
 	defer analyze(proc, idx)()
 	ap := arg.(*Argument)
 	if ap.ctr.state == End {
@@ -57,6 +62,13 @@ func Call(idx int, proc *process.Process, arg any, _ bool, _ bool) (bool, error)
 	}
 	s3Writers := ap.ctr.s3Writers
 	bat := proc.InputBatch()
+
+	defer func() {
+		if bat != nil {
+			fmt.Printf("insert bat.Length is %d  uuid is  %s \n", bat.Length(), ap.ctr.uuid_str)
+		}
+		fmt.Printf("insert time spent: %v ,uuid is %s,is remote: %v\n", time.Since(t_start), ap.ctr.uuid_str, ap.IsRemote)
+	}()
 	if bat == nil {
 		if ap.IsRemote {
 			// handle the last Batch that batchSize less than DefaultBlockMaxRows

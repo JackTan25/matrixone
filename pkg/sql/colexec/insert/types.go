@@ -29,6 +29,7 @@ const (
 type container struct {
 	state     int
 	s3Writers []*colexec.S3Writer
+	uuid_str  string
 }
 
 type Argument struct {
