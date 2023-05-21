@@ -15,6 +15,8 @@
 package colexec
 
 import (
+	"fmt"
+
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
@@ -67,6 +69,8 @@ type S3Writer struct {
 
 	typs []types.Type
 	ufs  []func(*vector.Vector, *vector.Vector, int64) error // function pointers for type conversion
+
+	Uuid_str string
 }
 
 const (
@@ -346,7 +350,9 @@ func (w *S3Writer) SortAndFlush(proc *process.Process) error {
 		if err := w.writeEndBlocks(proc); err != nil {
 			return err
 		}
+		fmt.Printf("batchSize: %d,normal flush: %s\n", w.Batsize, w.Uuid_str)
 	} else {
+		fmt.Printf("batchSize: %d,merge flush: %s\n", w.Batsize, w.Uuid_str)
 		var merge MergeInterface
 		var nulls []*nulls.Nulls
 		for i := 0; i < len(w.Bats); i++ {

@@ -74,6 +74,7 @@ func Call(idx int, proc *process.Process, arg any, _ bool, _ bool) (bool, error)
 			// handle the last Batch that batchSize less than DefaultBlockMaxRows
 			// for more info, refer to the comments about reSizeBatch
 			for _, s3Writer := range s3Writers {
+				s3Writer.Uuid_str = ap.ctr.uuid_str
 				if err := s3Writer.WriteS3CacheBatch(proc); err != nil {
 					ap.ctr.state = End
 					return false, err
@@ -95,6 +96,7 @@ func Call(idx int, proc *process.Process, arg any, _ bool, _ bool) (bool, error)
 	insertCtx := ap.InsertCtx
 	//write origin table
 	if ap.IsRemote {
+		s3Writers[0].Uuid_str = ap.ctr.uuid_str
 		// write to s3.
 		if err := s3Writers[0].WriteS3Batch(bat, proc); err != nil {
 			ap.ctr.state = End

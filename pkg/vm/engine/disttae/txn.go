@@ -16,6 +16,7 @@ package disttae
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"strings"
 	"time"
@@ -148,7 +149,7 @@ func (txn *Transaction) DumpBatch(force bool, offset int) error {
 			s3Writer.Put(mp[key][i], txn.proc)
 		}
 		err = s3Writer.SortAndFlush(txn.proc)
-
+		fmt.Printf("flush dump once: %s", txn.meta.ID)
 		if err != nil {
 			return err
 		}
