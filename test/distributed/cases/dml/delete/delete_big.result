@@ -10,10 +10,11 @@ insert into t_timeout select * from t_timeout;
 insert into t_timeout select * from t_timeout;
 insert into t_timeout select * from t_timeout;
 insert into t_timeout select * from t_timeout;
+insert into t_timeout select * from t_timeout;
 begin;
 insert into t_timeout select * from t_timeout;
 delete from t_timeout where a > 1;
 select count(*) from t_timeout;
 count(*)
-512
+1024
 rollback;
